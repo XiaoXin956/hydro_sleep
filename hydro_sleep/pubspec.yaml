@@ -1,0 +1,54 @@
+name: hydro_sleep
+description: "SmartSleep - BLE-based sleep monitoring application."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.1
+
+
+isar_version: &isar_version 3.3.0 # define the version to be used
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_bloc: ^9.1.1
+  equatable: ^2.0.8
+
+  # Charts
+  fl_chart: ^1.2.0
+
+  # Local storage
+  isar_community:
+    version: *isar_version
+  isar_community_flutter_libs: # contains Isar Core
+    version: *isar_version
+
+  flutter_secure_storage: ^10.3.1
+
+  # Routing
+  go_router: ^17.3.0
+
+  # BLE (reserved for future)
+  flutter_blue_plus: ^2.3.8
+
+  # Provider for state management
+  provider: ^6.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+  # Code generation
+  isar_community_generator:
+    version: *isar_version
+  build_runner: any
+
+
+flutter:
+  uses-material-design: true

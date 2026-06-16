@@ -54,5 +54,11 @@
   "sleepStageLight": "浅睡",
   "sleepStageRem": "REM",
   "sleepStageEyeMove": "眼动",
-  "sleepStageAwake": "清醒"
+  "sleepStageAwake": "清醒",
+  "factoryResetTitle": "恢复出厂设置",
+  "factoryResetMessage": "此操作将恢复所有设置为出厂默认值，且不可撤销。",
+  "cancel": "取消",
+  "confirm": "确认",
+  "showMore": "更多",
+  "showLess": "收起"
 }

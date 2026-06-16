@@ -17,6 +17,7 @@ class SecureStorageService {
   static const _keyScheduleEnd = 'schedule_end';
   static const _keyHistoryDevices = 'history_devices';
   static const _keyLastDeviceId = 'last_device_id';
+  static const _keyBedExitShutdown = 'bed_exit_shutdown';
 
   // 主题
   Future<String?> getTheme() async => await _storage.read(key: _keyTheme);
@@ -55,4 +56,10 @@ class SecureStorageService {
       await _storage.read(key: _keyLastDeviceId);
   Future<void> saveLastDeviceId(String id) async =>
       await _storage.write(key: _keyLastDeviceId, value: id);
+
+  // 离床关机
+  Future<String?> getBedExitShutdown() async =>
+      await _storage.read(key: _keyBedExitShutdown);
+  Future<void> saveBedExitShutdown(String value) async =>
+      await _storage.write(key: _keyBedExitShutdown, value: value);
 }

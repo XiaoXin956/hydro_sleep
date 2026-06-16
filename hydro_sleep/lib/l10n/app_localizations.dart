@@ -427,6 +427,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Awake'**
   String get sleepStageAwake;
+
+  /// No description provided for @factoryResetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore Factory Settings'**
+  String get factoryResetTitle;
+
+  /// No description provided for @factoryResetMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This will restore all settings to factory defaults. This action cannot be undone.'**
+  String get factoryResetMessage;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
+
+  /// No description provided for @showMore.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get showMore;
+
+  /// No description provided for @showLess.
+  ///
+  /// In en, this message translates to:
+  /// **'Less'**
+  String get showLess;
 }
 
 class _AppLocalizationsDelegate

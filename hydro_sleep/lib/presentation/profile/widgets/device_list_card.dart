@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/device_list/device_list_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 
@@ -11,33 +13,57 @@ class DeviceListCard extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.myDevices,
-              style: theme.textTheme.titleMedium,
+    return BlocBuilder<DeviceListCubit, DeviceListState>(
+      builder: (context, state) {
+        final visible = state.visibleDevices;
+
+        return Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.myDevices,
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 12),
+                ...visible.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final device = entry.value;
+                  return Column(
+                    children: [
+                      if (index > 0) _divider(theme),
+                      _DeviceTile(
+                        theme: theme,
+                        name: device.deviceName,
+                        connected: false, // BLE 预留，暂未连接
+                        l10n: l10n,
+                      ),
+                    ],
+                  );
+                }),
+                if (state.hasMore) ...[
+                  const SizedBox(height: 8),
+                  Center(
+                    child: TextButton(
+                      onPressed: () =>
+                          context.read<DeviceListCubit>().toggleExpand(),
+                      child: Text(
+                        state.expanded ? l10n.showLess : l10n.showMore,
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 12),
-            _DeviceTile(
-              theme: theme,
-              name: 'SmartSleep Pro',
-              status: l10n.connected,
-              connected: true,
-            ),
-            _divider(theme),
-            _DeviceTile(
-              theme: theme,
-              name: 'SmartSleep Lite',
-              status: l10n.disconnected,
-              connected: false,
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -52,18 +78,20 @@ class DeviceListCard extends StatelessWidget {
 class _DeviceTile extends StatelessWidget {
   final ThemeData theme;
   final String name;
-  final String status;
   final bool connected;
+  final AppLocalizations l10n;
 
   const _DeviceTile({
     required this.theme,
     required this.name,
-    required this.status,
     required this.connected,
+    required this.l10n,
   });
 
   @override
   Widget build(BuildContext context) {
+    final statusText = connected ? l10n.connected : l10n.disconnected;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -105,7 +133,7 @@ class _DeviceTile extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      status,
+                      statusText,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: connected ? AppColors.success : AppColors.error,
                       ),

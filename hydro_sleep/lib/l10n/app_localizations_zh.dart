@@ -176,4 +176,22 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get sleepStageAwake => '清醒';
+
+  @override
+  String get factoryResetTitle => '恢复出厂设置';
+
+  @override
+  String get factoryResetMessage => '此操作将恢复所有设置为出厂默认值，且不可撤销。';
+
+  @override
+  String get cancel => '取消';
+
+  @override
+  String get confirm => '确认';
+
+  @override
+  String get showMore => '更多';
+
+  @override
+  String get showLess => '收起';
 }

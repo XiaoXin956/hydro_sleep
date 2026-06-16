@@ -68,5 +68,11 @@
   "sleepStageLight": "Light",
   "sleepStageRem": "REM",
   "sleepStageEyeMove": "Active",
-  "sleepStageAwake": "Awake"
+  "sleepStageAwake": "Awake",
+  "factoryResetTitle": "Restore Factory Settings",
+  "factoryResetMessage": "This will restore all settings to factory defaults. This action cannot be undone.",
+  "cancel": "Cancel",
+  "confirm": "Confirm",
+  "showMore": "More",
+  "showLess": "Less"
 }

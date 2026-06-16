@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
+import 'package:hydro_sleep/core/temp_unit/temp_unit_cubit.dart';
+import 'package:provider/provider.dart';
 
 /// 温度单位选择器
 class TemperatureUnitSelector extends StatelessWidget {
@@ -7,6 +9,8 @@ class TemperatureUnitSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUnit = context.watch<TempUnitCubit>().state;
+
     return MenuAnchor(
       builder: (context, controller, child) {
         return GestureDetector(
@@ -21,7 +25,7 @@ class TemperatureUnitSelector extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '°C',
+                currentUnit,
                 style: const TextStyle(fontSize: 13),
               ),
               const Icon(Icons.arrow_drop_down, size: 18),
@@ -31,7 +35,9 @@ class TemperatureUnitSelector extends StatelessWidget {
       },
       menuChildren: AppConstants.temperatureUnitOptions.map((unit) {
         return MenuItemButton(
-          onPressed: () {},
+          onPressed: () {
+            context.read<TempUnitCubit>().setUnit(unit);
+          },
           child: Text(unit),
         );
       }).toList(),

@@ -176,4 +176,23 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get sleepStageAwake => 'Awake';
+
+  @override
+  String get factoryResetTitle => 'Restore Factory Settings';
+
+  @override
+  String get factoryResetMessage =>
+      'This will restore all settings to factory defaults. This action cannot be undone.';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get confirm => 'Confirm';
+
+  @override
+  String get showMore => 'More';
+
+  @override
+  String get showLess => 'Less';
 }

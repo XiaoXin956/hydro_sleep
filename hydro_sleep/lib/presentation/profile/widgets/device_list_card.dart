@@ -31,30 +31,72 @@ class DeviceListCard extends StatelessWidget {
                 ...visible.asMap().entries.map((entry) {
                   final index = entry.key;
                   final device = entry.value;
+                  final isLast = index == visible.length - 1;
                   return Column(
                     children: [
                       if (index > 0) _divider(theme),
-                      _DeviceTile(
-                        theme: theme,
-                        name: device.deviceName,
-                        connected: false, // BLE 预留，暂未连接
-                        l10n: l10n,
+                      AnimatedCrossFade(
+                        firstChild: const SizedBox.shrink(),
+                        secondChild: _DeviceTile(
+                          theme: theme,
+                          name: device.deviceName,
+                          connected: false, // BLE 预留，暂未连接
+                          l10n: l10n,
+                        ),
+                        firstCurve: Curves.easeOut,
+                        secondCurve: Curves.easeIn,
+                        sizeCurve: Curves.easeInOut,
+                        crossFadeState: isLast && state.expanded
+                            ? CrossFadeState.showSecond
+                            : CrossFadeState.showFirst,
+                        duration: const Duration(milliseconds: 300),
                       ),
                     ],
                   );
                 }),
                 if (state.hasMore) ...[
                   const SizedBox(height: 8),
-                  Center(
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (Widget child, Animation<double> animation) {
+                      final offsetTween = Tween<Offset>(
+                        begin: const Offset(0.15, 0),
+                        end: Offset.zero,
+                      );
+                      final fadeTween = Tween<double>(begin: 0, end: 1);
+                      return SlideTransition(
+                        position: animation.drive(offsetTween),
+                        child: FadeTransition(
+                          opacity: animation.drive(fadeTween),
+                          child: child,
+                        ),
+                      );
+                    },
                     child: TextButton(
+                      key: ValueKey<bool>(state.expanded),
                       onPressed: () =>
                           context.read<DeviceListCubit>().toggleExpand(),
-                      child: Text(
-                        state.expanded ? l10n.showLess : l10n.showMore,
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 13,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          AnimatedRotation(
+                            turns: state.expanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 300),
+                            child: Icon(
+                              Icons.expand_more,
+                              size: 16,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            state.expanded ? l10n.showLess : l10n.showMore,
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

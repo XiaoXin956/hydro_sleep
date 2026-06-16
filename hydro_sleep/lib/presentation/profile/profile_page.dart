@@ -114,33 +114,7 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _factoryResetRowWidget(ThemeData theme) {
-    return Card(
-      child: InkWell(
-        onTap: () {
-          // TODO: 恢复出厂设置
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Text(
-                'Restore Factory Settings',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.orange,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: AppColors.textHint,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return const _FactoryResetRow();
   }
 }
 
@@ -170,6 +144,69 @@ class _SettingsRow extends StatelessWidget {
           child,
           // SizedBox(width: 120, child: child),
         ],
+      ),
+    );
+  }
+}
+
+class _FactoryResetRow extends StatefulWidget {
+  const _FactoryResetRow();
+
+  @override
+  State<_FactoryResetRow> createState() => _FactoryResetRowState();
+}
+
+class _FactoryResetRowState extends State<_FactoryResetRow> {
+  bool _loading = false;
+
+  void _onTap() {
+    if (_loading) return;
+    setState(() => _loading = true);
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _loading = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: InkWell(
+        onTap: _onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Text(
+                'Restore Factory Settings',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.orange,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _loading
+                    ? const SizedBox(
+                        key: ValueKey('spinner'),
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.red,
+                        ),
+                      )
+                    : Icon(
+                        key: const ValueKey('arrow'),
+                        Icons.arrow_forward_ios,
+                        size: 16,
+                        color: AppColors.textHint,
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

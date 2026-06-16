@@ -22,7 +22,7 @@ class HeartRateChart extends StatelessWidget {
               'Heart Rate',
               style: theme.textTheme.titleMedium,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
@@ -48,12 +48,10 @@ class HeartRateChart extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             SizedBox(
-              height: 120,
+              height: 80,
               child: LineChart(
                 mainChartData(
                   data: MockData.heartRateCurve,
-                  minVal: 40.0,
-                  maxVal: 100.0,
                 ),
               ),
             ),
@@ -105,11 +103,29 @@ class _SummaryItem extends StatelessWidget {
 
 LineChartData mainChartData({
   required List<double> data,
-  required double minVal,
-  required double maxVal,
 }) {
+  final dataMin = data.reduce((a, b) => a < b ? a : b);
+  final dataMax = data.reduce((a, b) => a > b ? a : b);
+  final minVal = dataMin - 20;
+  final maxVal = dataMax + 20;
+  // X 轴：23:00→07:00, 每点 5 分钟
+  String xLabel(int index) {
+    final totalMin = 23 * 60 + index * 5;
+    final h = (totalMin ~/ 60) % 24;
+    final m = totalMin % 60;
+    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+  }
+
   return LineChartData(
-    gridData: FlGridData(show: false),
+    gridData: FlGridData(
+      show: true,
+      drawVerticalLine: false,
+      horizontalInterval: (maxVal - minVal) / 4,
+      getDrawingHorizontalLine: (value) => FlLine(
+        color: const Color(0xFFE0E0E0),
+        strokeWidth: 0.5,
+      ),
+    ),
     titlesData: FlTitlesData(
       leftTitles: AxisTitles(
         sideTitles: SideTitles(
@@ -131,14 +147,16 @@ LineChartData mainChartData({
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 24,
+          interval: 12, // 每小时
           getTitlesWidget: (value, meta) {
-            if (value.toInt() % 10 == 0) {
-              final minutes = value.toInt();
-              final h = minutes ~/ 60;
-              final m = minutes % 60;
+            final idx = value.toInt();
+            if (idx >= 0 && idx < data.length && idx % 12 == 0) {
               return Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('$h:${m.toString().padLeft(2, '0')}'),
+                child: Text(
+                  xLabel(idx),
+                  style: const TextStyle(fontSize: 10),
+                ),
               );
             }
             return const SizedBox.shrink();

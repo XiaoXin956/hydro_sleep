@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 lib/
   app/app.dart              - App root widget (Provider + BlocProvider + MaterialApp.router)
-  main.dart                 - Entry point (MultiProvider: ThemeProvider, LocaleCubit)
+  main.dart                 - Entry point (MultiProvider: ThemeProvider, LocaleCubit, FactoryResetCubit, TempUnitCubit, BedExitCubit, DeviceListCubit)
   routing/app_router.dart   - GoRouter config (Startup -> HomePage tabs -> Search)
   core/
     constants/app_constants.dart  - App-wide constants
@@ -79,7 +79,12 @@ flutter run
 
 ## Architecture Notes
 
-- **State management**: `ThemeProvider` (ChangeNotifier/provider) for theme. `LocaleCubit` (flutter_bloc) for language. All other state is local `StatefulWidget`.
+- **State management**: `ThemeProvider` (ChangeNotifier/provider) for theme. BLoC modules (all `Cubit` pattern):
+  - `LocaleCubit` — language (EN/ZH), persists via `SecureStorageService.saveLanguage()`
+  - `FactoryResetCubit` — 3-stage flow (initial → loading → success), Equatable state, 5s simulated reset
+  - `TempUnitCubit` — `Cubit<String>`, °C/°F toggle, persists via `SecureStorageService`
+  - `BedExitCubit` — `Cubit<String>`, bed exit shutdown timer, persists via `SecureStorageService`
+  - `DeviceListCubit` — `DeviceListState` with `List<HistoryDevice>` + expand/collapse, loads from `DeviceRepository`
 - **Internationalization**: ARB-based (`flutter gen-l10n`). English is default. Language persisted via `SecureStorageService.saveLanguage()`. `LocaleCubit` loads saved locale on startup. Use `AppLocalizations.of(context)!` to access translations.
 - **Data layer**: Two singletons - `HydroSleepDatabase` (Isar) and `SecureStorageService` (flutter_secure_storage). Repositories wrap these.
 - **Routing**: GoRouter with `StatefulShellRoute.indexedStack` for 3-tab home (Home/Report/Profile). Startup -> /home auto-navigates after 2s.

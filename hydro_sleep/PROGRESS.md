@@ -21,6 +21,13 @@
   - LocaleCubit（BLoC）管理语言状态，持久化到 SecureStorageService
   - 替换所有页面硬编码字符串（16 个文件）
   - LanguageSelector 支持真正的语言切换并即时刷新
+- [x] 「我的」页面 BLoC 模块完善
+  - FactoryResetCubit：确认弹框 → 5s 模拟恢复流程，3 阶段状态（initial/loading/success）
+  - TempUnitCubit：°C/°F 温度单位切换，本地持久化
+  - BedExitCubit：离床关机时间选择，本地持久化
+  - DeviceListCubit：设备列表展开/收起，默认显示前 3 条，本地持久化
+  - SecureStorageService 新增 bedExit shutdown 存储方法
+  - 补充 l10n 字符串：factoryReset/showMore/showLess
 
 ## 待完成
 
@@ -33,7 +40,6 @@
 - [ ] BLE 连接集成（flutter_blue_plus）
 - [ ] 实时数据采集与展示
 - [ ] 睡眠数据分析算法
-- [ ] 设置项持久化（温度单位、模式偏好、离床关机等）
 - [ ] 日期选择器（报告页 DateHeader）
 
 ### 平台适配

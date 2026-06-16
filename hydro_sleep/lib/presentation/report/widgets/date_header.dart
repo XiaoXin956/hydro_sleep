@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 日期切换头
 class DateHeader extends StatefulWidget {
@@ -24,7 +25,7 @@ class _DateHeaderState extends State<DateHeader> {
     });
   }
 
-  String _formatDate(DateTime date) {
+  String _formatDate(DateTime date, AppLocalizations l10n) {
     final months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -35,11 +36,11 @@ class _DateHeaderState extends State<DateHeader> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        // 日期 + 导航
         Row(
           children: [
             IconButton(
@@ -47,7 +48,7 @@ class _DateHeaderState extends State<DateHeader> {
               onPressed: _previousDay,
             ),
             Text(
-              _formatDate(_selectedDate),
+              _formatDate(_selectedDate, l10n),
               style: theme.textTheme.titleMedium,
             ),
             IconButton(
@@ -56,7 +57,6 @@ class _DateHeaderState extends State<DateHeader> {
             ),
           ],
         ),
-        // 日/周/月/年 切换
         MenuAnchor(
           builder: (context, controller, child) {
             return GestureDetector(
@@ -80,7 +80,7 @@ class _DateHeaderState extends State<DateHeader> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      '日',
+                      l10n.dateDay,
                       style: TextStyle(
                         color: AppColors.primary,
                         fontWeight: FontWeight.w600,
@@ -98,10 +98,10 @@ class _DateHeaderState extends State<DateHeader> {
             );
           },
           menuChildren: [
-            _PeriodMenuItem('日', () {}),
-            _PeriodMenuItem('周', () {}),
-            _PeriodMenuItem('月', () {}),
-            _PeriodMenuItem('年', () {}),
+            _PeriodMenuItem(l10n.dateDay, () {}),
+            _PeriodMenuItem(l10n.dateWeek, () {}),
+            _PeriodMenuItem(l10n.dateMonth, () {}),
+            _PeriodMenuItem(l10n.dateYear, () {}),
           ],
         ),
       ],

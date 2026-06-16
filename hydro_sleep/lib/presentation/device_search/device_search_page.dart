@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/core/utils/mock_data.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 搜索设备页
 class DeviceSearchPage extends StatelessWidget {
@@ -10,10 +11,11 @@ class DeviceSearchPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('搜索设备'),
+        title: Text(l10n.searchDevice),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
@@ -21,16 +23,14 @@ class DeviceSearchPage extends StatelessWidget {
       ),
       body: CustomScrollView(
         slivers: [
-          // 历史设备区域
-          _buildHistorySection(context, theme),
-          // 扫描区域标题
+          _buildHistorySection(context, theme, l10n),
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             sliver: SliverToBoxAdapter(
               child: Row(
                 children: [
                   Text(
-                    '可用设备',
+                    l10n.availableDevices,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
@@ -41,7 +41,6 @@ class DeviceSearchPage extends StatelessWidget {
               ),
             ),
           ),
-          // 设备列表
           SliverPadding(
             padding: const EdgeInsets.all(16),
             sliver: SliverList(
@@ -54,7 +53,6 @@ class DeviceSearchPage extends StatelessWidget {
                     id: device['id'] as String,
                     rssi: device['rssi'] as int,
                     onTap: () {
-                      // TODO: BLE 连接逻辑
                       context.pop();
                     },
                   );
@@ -68,8 +66,7 @@ class DeviceSearchPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHistorySection(BuildContext context, ThemeData theme) {
-    // 模拟：有历史设备
+  Widget _buildHistorySection(BuildContext context, ThemeData theme, AppLocalizations l10n) {
     if (MockData.historyDevices.isEmpty) {
       return const SliverToBoxAdapter(child: SizedBox.shrink());
     }
@@ -82,7 +79,7 @@ class DeviceSearchPage extends StatelessWidget {
           children: [
             const SizedBox(height: 8),
             Text(
-              '以往连接过的设备',
+              l10n.previouslyConnected,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -109,7 +106,6 @@ class DeviceSearchPage extends StatelessWidget {
                   subtitle: Text(device['id'] as String),
                   trailing: ElevatedButton(
                     onPressed: () {
-                      // TODO: 连接历史设备
                       context.pop();
                     },
                     style: ElevatedButton.styleFrom(
@@ -120,7 +116,7 @@ class DeviceSearchPage extends StatelessWidget {
                         vertical: 8,
                       ),
                     ),
-                    child: const Text('连接'),
+                    child: Text(l10n.connect),
                   ),
                 ),
               );
@@ -177,7 +173,7 @@ class _DeviceTile extends StatelessWidget {
                   vertical: 8,
                 ),
               ),
-              child: const Text('连接'),
+              child: Text(AppLocalizations.of(context)!.connect),
             ),
           ],
         ),

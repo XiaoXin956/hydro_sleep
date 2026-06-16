@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/utils/mock_data.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 睡眠阶段汇总
 class SleepStagesSummary extends StatelessWidget {
@@ -16,7 +17,7 @@ class SleepStagesSummary extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Sleep Stages',
+              AppLocalizations.of(context)!.sleepStages,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
@@ -65,7 +66,6 @@ class _StageItem extends StatelessWidget {
 
     return Column(
       children: [
-        // 圆点
         Container(
           width: 10,
           height: 10,
@@ -75,7 +75,6 @@ class _StageItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        // 名称
         Text(
           name,
           style: theme.textTheme.bodyMedium?.copyWith(
@@ -84,13 +83,11 @@ class _StageItem extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        // 时长
         Text(
           duration,
           style: theme.textTheme.titleMedium,
         ),
         const SizedBox(height: 2),
-        // 百分比
         Text(
           percentage,
           style: theme.textTheme.bodySmall,

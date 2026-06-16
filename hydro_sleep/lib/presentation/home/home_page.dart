@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 首页（Tab 容器，仅负责导航）
 class HomePage extends StatelessWidget {
@@ -15,6 +16,7 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: BottomNavigationBar(
@@ -23,21 +25,21 @@ class HomePage extends StatelessWidget {
         selectedItemColor: const Color(0xFF1976D2),
         unselectedItemColor: const Color(0xFF757575),
         type: BottomNavigationBarType.fixed,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
-            label: '首页',
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: l10n.bottomNavHome,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.assessment_outlined),
-            activeIcon: Icon(Icons.assessment),
-            label: '报告',
+            icon: const Icon(Icons.assessment_outlined),
+            activeIcon: const Icon(Icons.assessment),
+            label: l10n.bottomNavReport,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
-            label: '我的',
+            icon: const Icon(Icons.person_outline),
+            activeIcon: const Icon(Icons.person),
+            label: l10n.bottomNavProfile,
           ),
         ],
       ),

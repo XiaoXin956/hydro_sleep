@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dart';
@@ -13,12 +14,14 @@ class ReportPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        // 顶部栏
         SliverAppBar(
           pinned: true,
           expandedHeight: 60,
           flexibleSpace: FlexibleSpaceBar(
-            title: const Text('Sleep Report', style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              AppLocalizations.of(context)!.reportTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
             centerTitle: false,
           ),

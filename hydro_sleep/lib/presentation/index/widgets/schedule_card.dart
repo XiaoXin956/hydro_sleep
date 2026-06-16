@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 日程卡片
 class ScheduleCard extends StatefulWidget {
@@ -16,6 +17,7 @@ class _ScheduleCardState extends State<ScheduleCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -23,14 +25,11 @@ class _ScheduleCardState extends State<ScheduleCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题
             Text(
-              'Schedule',
+              l10n.schedule,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-
-            // 时间范围
             Row(
               children: [
                 Expanded(
@@ -52,14 +51,12 @@ class _ScheduleCardState extends State<ScheduleCard> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Auto adjust 开关
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
                   child: Text(
-                    'Auto adjust during sleep',
+                    l10n.autoAdjustDuringSleep,
                     style: theme.textTheme.bodyMedium,
                   ),
                 ),

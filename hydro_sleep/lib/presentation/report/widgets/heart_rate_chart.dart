@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/core/utils/mock_data.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 心率卡片
 class HeartRateChart extends StatelessWidget {
@@ -10,6 +11,7 @@ class HeartRateChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -17,9 +19,8 @@ class HeartRateChart extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 摘要行
             Text(
-              'Heart Rate',
+              l10n.heartRate,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -28,21 +29,21 @@ class HeartRateChart extends StatelessWidget {
               children: [
                 _SummaryItem(
                   theme: theme,
-                  label: '平均',
+                  label: l10n.average,
                   value: '${MockData.avgHeartRate}',
-                  unit: 'BPM',
+                  unit: l10n.bpm,
                 ),
                 _SummaryItem(
                   theme: theme,
-                  label: '最低',
+                  label: l10n.minimum,
                   value: '${MockData.minHeartRate}',
-                  unit: 'BPM',
+                  unit: l10n.bpm,
                 ),
                 _SummaryItem(
                   theme: theme,
-                  label: '最高',
+                  label: l10n.maximum,
                   value: '${MockData.maxHeartRate}',
-                  unit: 'BPM',
+                  unit: l10n.bpm,
                 ),
               ],
             ),
@@ -108,7 +109,7 @@ LineChartData mainChartData({
   final dataMax = data.reduce((a, b) => a > b ? a : b);
   final minVal = dataMin - 20;
   final maxVal = dataMax + 20;
-  // X 轴：23:00→07:00, 每点 5 分钟
+
   String xLabel(int index) {
     final totalMin = 23 * 60 + index * 5;
     final h = (totalMin ~/ 60) % 24;
@@ -147,7 +148,7 @@ LineChartData mainChartData({
         sideTitles: SideTitles(
           showTitles: true,
           reservedSize: 24,
-          interval: 12, // 每小时
+          interval: 12,
           getTitlesWidget: (value, meta) {
             final idx = value.toInt();
             if (idx >= 0 && idx < data.length && idx % 12 == 0) {

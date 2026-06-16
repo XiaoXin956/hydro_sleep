@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/index/widgets/connection_status_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/mode_selection_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/schedule_card.dart';
@@ -12,23 +13,19 @@ class IndexPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        // 顶部栏
         SliverAppBar(
           pinned: true,
           expandedHeight: 70,
           flexibleSpace: FlexibleSpaceBar(
-            title: const Text(
-              'SmartSleep',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            title: Text(
+              AppLocalizations.of(context)!.appTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
             centerTitle: false,
           ),
-          actions: [
-
-          ],
+          actions: [],
         ),
-        // 内容区域
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverList(

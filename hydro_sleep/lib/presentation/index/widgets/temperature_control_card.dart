@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
-/// 温度预设项
 class _TemperaturePreset {
   final double temp;
   final String label;
@@ -23,6 +23,7 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -30,24 +31,19 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 标题
             Text(
-              '温度',
+              l10n.temperature,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-
-            // 当前温度
             Text(
-              '当前温度 22.5°C',
+              l10n.currentTemp(22),
               style: theme.textTheme.titleLarge?.copyWith(
                 color: AppColors.primary,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 4),
-
-            // 滑块
             Row(
               children: [
                 const Text('15°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
@@ -69,7 +65,7 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
             ),
             Center(
               child: Text(
-                '目标温度 ${_targetTemp.toInt()}°C',
+                l10n.targetTemp(_targetTemp.toInt()),
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.bold,
@@ -77,7 +73,6 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
               ),
             ),
             const SizedBox(height: 4),
-            // 快捷预设网格 2x4
             _presetGrid(theme),
           ],
         ),

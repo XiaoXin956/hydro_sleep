@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/core/utils/mock_data.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 睡眠 & 温度曲线卡片（双 Y 轴，共用 0-35 范围）
 class SleepTempCurve extends StatelessWidget {
@@ -10,24 +11,41 @@ class SleepTempCurve extends StatelessWidget {
   static const double _yMin = 0;
   static const double _yMax = 35;
 
-  // 睡眠阶段 → Y 值
   static const double _deepSleep = 4;
   static const double _lightSleep = 10;
   static const double _rem = 16;
   static const double _eyeMove = 24;
   static const double _awake = 30;
 
-  static final _stageMap = <double, String>{
-    _deepSleep: '深睡',
-    _lightSleep: '浅睡',
-    _rem: 'REM',
-    _eyeMove: '眼动',
-    _awake: '清醒',
+  static final _stageKeys = <double, String>{
+    _deepSleep: 'deep',
+    _lightSleep: 'light',
+    _rem: 'rem',
+    _eyeMove: 'eyeMove',
+    _awake: 'awake',
   };
+
+  String _stageLabel(String key, AppLocalizations l10n) {
+    switch (key) {
+      case 'deep':
+        return l10n.sleepStageDeep;
+      case 'light':
+        return l10n.sleepStageLight;
+      case 'rem':
+        return l10n.sleepStageRem;
+      case 'eyeMove':
+        return l10n.sleepStageEyeMove;
+      case 'awake':
+        return l10n.sleepStageAwake;
+      default:
+        return key;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -36,7 +54,7 @@ class SleepTempCurve extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Sleep & Temp Curve',
+              l10n.sleepTempCurve,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
@@ -46,6 +64,7 @@ class SleepTempCurve extends StatelessWidget {
                 _chartData(
                   sleepStages: MockData.sleepStagesCurve,
                   temperatureData: MockData.temperatureCurve,
+                  l10n: l10n,
                 ),
                 duration: const Duration(milliseconds: 250),
               ),
@@ -54,9 +73,9 @@ class SleepTempCurve extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _legendItem(theme, 'Sleep', AppColors.primary),
+                _legendItem(theme, l10n.sleepLegend, AppColors.primary),
                 const SizedBox(width: 24),
-                _legendItem(theme, 'Temp', AppColors.temperatureCurve),
+                _legendItem(theme, l10n.tempLegend, AppColors.temperatureCurve),
               ],
             ),
           ],
@@ -83,9 +102,10 @@ class SleepTempCurve extends StatelessWidget {
     );
   }
 
-  static LineChartData _chartData({
+  LineChartData _chartData({
     required List<double> sleepStages,
     required List<double> temperatureData,
+    required AppLocalizations l10n,
   }) {
     final sleepSpots = List.generate(
       sleepStages.length,
@@ -96,7 +116,6 @@ class SleepTempCurve extends StatelessWidget {
       (i) => FlSpot(i.toDouble(), temperatureData[i]),
     );
 
-    // X 轴：23:00→06:00, 每点 5 分钟, 共72点
     String xLabel(int index) {
       final totalMin = 23 * 60 + index * 5;
       final h = (totalMin ~/ 60) % 24;
@@ -115,18 +134,17 @@ class SleepTempCurve extends StatelessWidget {
         ),
       ),
       titlesData: FlTitlesData(
-        // 左 Y 轴：睡眠阶段标签
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 36,
             interval: 1,
             getTitlesWidget: (value, meta) {
-              if (_stageMap.containsKey(value)) {
+              if (_stageKeys.containsKey(value)) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 4),
                   child: Text(
-                    _stageMap[value]!,
+                    _stageLabel(_stageKeys[value]!, l10n),
                     style: const TextStyle(fontSize: 9, color: Color(0xFFBDBDBD)),
                   ),
                 );
@@ -135,7 +153,6 @@ class SleepTempCurve extends StatelessWidget {
             },
           ),
         ),
-        // 右 Y 轴：温度
         rightTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
@@ -152,12 +169,11 @@ class SleepTempCurve extends StatelessWidget {
             },
           ),
         ),
-        // X 轴：时间 23:00→06:00
         bottomTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 24,
-            interval: 12, // 每小时
+            interval: 12,
             getTitlesWidget: (value, meta) {
               final idx = value.toInt();
               if (idx >= 0 && idx < sleepStages.length && idx % 12 == 0) {
@@ -176,7 +192,6 @@ class SleepTempCurve extends StatelessWidget {
         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
       ),
       lineBarsData: [
-        // Sleep 曲线（阶梯折线）
         LineChartBarData(
           spots: sleepSpots,
           isCurved: false,
@@ -188,7 +203,6 @@ class SleepTempCurve extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.08),
           ),
         ),
-        // Temperature 曲线（平滑）
         LineChartBarData(
           spots: tempSpots,
           isCurved: true,

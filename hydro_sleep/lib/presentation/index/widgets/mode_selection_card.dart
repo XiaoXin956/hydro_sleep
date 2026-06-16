@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 模式选择卡片
 class ModeSelectionCard extends StatelessWidget {
@@ -8,6 +9,7 @@ class ModeSelectionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -16,7 +18,7 @@ class ModeSelectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '模式',
+              l10n.mode,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
@@ -24,7 +26,7 @@ class ModeSelectionCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _ModeButton(
-                    label: '自动模式',
+                    label: l10n.autoMode,
                     icon: Icons.auto_awesome,
                     isSelected: true,
                   ),
@@ -32,7 +34,7 @@ class ModeSelectionCard extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _ModeButton(
-                    label: '手动模式',
+                    label: l10n.manualMode,
                     icon: Icons.tune,
                     isSelected: false,
                   ),

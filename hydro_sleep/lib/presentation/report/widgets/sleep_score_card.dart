@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/core/utils/mock_data.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 睡眠评分卡片
 class SleepScoreCard extends StatelessWidget {
@@ -12,20 +13,19 @@ class SleepScoreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            // 左侧：圆形进度环
             SizedBox(
               width: 120,
               height: 120,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // 底色
                   CustomPaint(
                     size: const Size(120, 120),
                     painter: _CircleBgPainter(
@@ -34,7 +34,6 @@ class SleepScoreCard extends StatelessWidget {
                       color: AppColors.lightGrayBg,
                     ),
                   ),
-                  // 进度
                   CustomPaint(
                     size: const Size(120, 120),
                     painter: _CircleProgressPainter(
@@ -44,7 +43,6 @@ class SleepScoreCard extends StatelessWidget {
                       color: AppColors.success,
                     ),
                   ),
-                  // 中心文字
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -56,7 +54,7 @@ class SleepScoreCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '睡眠评分',
+                        l10n.sleepScore,
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
@@ -65,12 +63,10 @@ class SleepScoreCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 20),
-            // 右侧：信息列
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 睡眠时长
                   Text(
                     MockData.sleepDuration,
                     style: theme.textTheme.titleLarge?.copyWith(
@@ -79,19 +75,17 @@ class SleepScoreCard extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 4),
-                  // Total Sleep
                   Text(
-                    'Total Sleep',
+                    l10n.totalSleep,
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
-                  // 入睡 → 起床
                   Text(
                     '${MockData.bedtime}  →  ${MockData.wakeTime}',
                     style: theme.textTheme.bodyMedium,
                   ),
                   Text(
-                    'Bedtime  →  Wake Up',
+                    l10n.bedtimeToWakeUp,
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
@@ -104,7 +98,6 @@ class SleepScoreCard extends StatelessWidget {
   }
 }
 
-/// 圆形进度绘制器
 class _CircleBgPainter extends CustomPainter {
   final double size;
   final double strokeWidth;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 设备列表卡片
 class DeviceListCard extends StatelessWidget {
@@ -8,6 +9,7 @@ class DeviceListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Card(
       child: Padding(
@@ -16,22 +18,21 @@ class DeviceListCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'My Devices',
+              l10n.myDevices,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 12),
-            // 测试设备条目
             _DeviceTile(
               theme: theme,
               name: 'SmartSleep Pro',
-              status: 'Connected',
+              status: l10n.connected,
               connected: true,
             ),
             _divider(theme),
             _DeviceTile(
               theme: theme,
               name: 'SmartSleep Lite',
-              status: 'Disconnected',
+              status: l10n.disconnected,
               connected: false,
             ),
           ],
@@ -67,7 +68,6 @@ class _DeviceTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          // 头像占位
           Container(
             width: 40,
             height: 40,
@@ -82,7 +82,6 @@ class _DeviceTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          // 信息
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

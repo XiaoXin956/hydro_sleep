@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 个人档案卡片
 class ProfileCard extends StatelessWidget {
@@ -14,7 +15,6 @@ class ProfileCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // 头像占位
             Container(
               width: 56,
               height: 56,
@@ -29,13 +29,12 @@ class ProfileCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 16),
-            // 信息
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '用户',
+                    AppLocalizations.of(context)!.defaultUserName,
                     style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),

@@ -1,0 +1,72 @@
+{
+  "@@locale": "en",
+  "appTitle": "SmartSleep",
+  "smartSleepMonitor": "Smart Sleep Monitor",
+  "bottomNavHome": "Home",
+  "bottomNavReport": "Report",
+  "bottomNavProfile": "Profile",
+  "profileTitle": "Profile",
+  "defaultUserName": "User",
+  "myDevices": "My Devices",
+  "connected": "Connected",
+  "disconnected": "Disconnected",
+  "language": "Language",
+  "temperatureUnit": "Temperature Unit",
+  "modePreference": "Mode Preference",
+  "bedExitShutdown": "Bed Exit Shutdown",
+  "restoreFactorySettings": "Restore Factory Settings",
+  "reportTitle": "Sleep Report",
+  "sleepScore": "Sleep Score",
+  "totalSleep": "Total Sleep",
+  "bedtimeToWakeUp": "Bedtime  →  Wake Up",
+  "sleepStages": "Sleep Stages",
+  "sleepTempCurve": "Sleep & Temp Curve",
+  "sleepLegend": "Sleep",
+  "tempLegend": "Temp",
+  "heartRate": "Heart Rate",
+  "average": "Avg",
+  "minimum": "Min",
+  "maximum": "Max",
+  "bpm": "BPM",
+  "dateDay": "Day",
+  "dateWeek": "Week",
+  "dateMonth": "Month",
+  "dateYear": "Year",
+  "temperature": "Temperature",
+  "currentTemp": "Current Temp {temp}°C",
+  "@currentTemp": {
+    "placeholders": {
+      "temp": {
+        "type": "int"
+      }
+    }
+  },
+  "targetTemp": "Target Temp {temp}°C",
+  "@targetTemp": {
+    "placeholders": {
+      "temp": {
+        "type": "int"
+      }
+    }
+  },
+  "mode": "Mode",
+  "autoMode": "Auto",
+  "manualMode": "Manual",
+  "schedule": "Schedule",
+  "autoAdjustDuringSleep": "Auto adjust during sleep",
+  "searchDevice": "Search Device",
+  "availableDevices": "Available Devices",
+  "previouslyConnected": "Previously Connected Devices",
+  "reconnect": "Reconnect",
+  "connectNewDevice": "Connect New Device",
+  "addDevice": "Add Device",
+  "connect": "Connect",
+  "notConnected": "Device Not Connected",
+  "cannotConnect": "Cannot Connect",
+  "deviceConnected": "Connected",
+  "sleepStageDeep": "Deep",
+  "sleepStageLight": "Light",
+  "sleepStageRem": "REM",
+  "sleepStageEyeMove": "Active",
+  "sleepStageAwake": "Awake"
+}

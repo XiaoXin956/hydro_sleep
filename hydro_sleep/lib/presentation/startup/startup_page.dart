@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 启动页
 class StartupPage extends StatelessWidget {
@@ -19,7 +20,6 @@ class StartupPage extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo 占位
             Container(
               width: 100,
               height: 100,
@@ -43,9 +43,9 @@ class StartupPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              '智能睡眠监测',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.smartSleepMonitor,
+              style: const TextStyle(
                 fontSize: 16,
                 color: Color(0xFF757575),
               ),

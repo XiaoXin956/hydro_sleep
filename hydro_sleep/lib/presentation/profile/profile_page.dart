@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
+import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/device_list_card.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/language_selector.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/mode_preference_selector.dart';
@@ -15,17 +16,17 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return CustomScrollView(
       slivers: [
-        // 顶部栏
         SliverAppBar(
           pinned: true,
           expandedHeight: 60,
           flexibleSpace: FlexibleSpaceBar(
-            title: const Text(
-              '我的',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            title: Text(
+              l10n.profileTitle,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
             centerTitle: false,
@@ -37,23 +38,14 @@ class ProfilePage extends StatelessWidget {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final items = <Widget>[
-                  // 个人档案
                   const ProfileCard(),
                   const SizedBox(height: 16),
-
-                  // 设备列表
                   const DeviceListCard(),
                   const SizedBox(height: 16),
-
-                  // 设置项
-                  _buildSettingsWidget(theme),
+                  _buildSettingsWidget(theme, l10n),
                   const SizedBox(height: 16),
-
-                  // 恢复出厂设置
-                  _factoryResetRowWidget(theme),
+                  const _FactoryResetRow(),
                   const SizedBox(height: 16),
-
-                  // 底部版本信息
                   Center(
                     child: Text(
                       'SmartSleep v${AppConstants.appVersion}',
@@ -74,31 +66,31 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsWidget(ThemeData theme) {
+  Widget _buildSettingsWidget(ThemeData theme, AppLocalizations l10n) {
     return Card(
       child: Column(
         children: [
           _SettingsRow(
             theme: theme,
-            label: 'Language',
+            label: l10n.language,
             child: const LanguageSelector(),
           ),
           _divider(theme),
           _SettingsRow(
             theme: theme,
-            label: 'Temperature Unit',
+            label: l10n.temperatureUnit,
             child: const TemperatureUnitSelector(),
           ),
           _divider(theme),
           _SettingsRow(
             theme: theme,
-            label: 'Mode Preference',
+            label: l10n.modePreference,
             child: const ModePreferenceSelector(),
           ),
           _divider(theme),
           _SettingsRow(
             theme: theme,
-            label: 'Bed Exit Shutdown',
+            label: l10n.bedExitShutdown,
             child: const BedExitShutdownSelector(),
           ),
         ],
@@ -111,10 +103,6 @@ class ProfilePage extends StatelessWidget {
       height: 1,
       color: theme.dividerTheme.color,
     );
-  }
-
-  Widget _factoryResetRowWidget(ThemeData theme) {
-    return const _FactoryResetRow();
   }
 }
 
@@ -140,9 +128,8 @@ class _SettingsRow extends StatelessWidget {
             label,
             style: theme.textTheme.bodyMedium,
           ),
-          Spacer(),
+          const Spacer(),
           child,
-          // SizedBox(width: 120, child: child),
         ],
       ),
     );
@@ -170,6 +157,7 @@ class _FactoryResetRowState extends State<_FactoryResetRow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Card(
       child: InkWell(
         onTap: _onTap,
@@ -178,7 +166,7 @@ class _FactoryResetRowState extends State<_FactoryResetRow> {
           child: Row(
             children: [
               Text(
-                'Restore Factory Settings',
+                l10n.restoreFactorySettings,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: Colors.orange,
                   fontWeight: FontWeight.w500,
@@ -197,8 +185,8 @@ class _FactoryResetRowState extends State<_FactoryResetRow> {
                           color: Colors.red,
                         ),
                       )
-                    : Icon(
-                        key: const ValueKey('arrow'),
+                    : const Icon(
+                        key: ValueKey('arrow'),
                         Icons.arrow_forward_ios,
                         size: 16,
                         color: AppColors.textHint,

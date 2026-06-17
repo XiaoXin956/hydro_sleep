@@ -146,6 +146,12 @@ abstract class AppLocalizations {
   /// **'My Devices'**
   String get myDevices;
 
+  /// No description provided for @generalSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'General Settings'**
+  String get generalSettings;
+
   /// No description provided for @connected.
   ///
   /// In en, this message translates to:

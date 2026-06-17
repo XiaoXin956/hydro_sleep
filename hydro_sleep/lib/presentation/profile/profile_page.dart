@@ -70,32 +70,41 @@ class ProfilePage extends StatelessWidget {
 
   Widget _buildSettingsWidget(ThemeData theme, AppLocalizations l10n) {
     return Card(
-      child: Column(
-        children: [
-          _SettingsRow(
-            theme: theme,
-            label: l10n.language,
-            child: const LanguageSelector(),
-          ),
-          _divider(theme),
-          _SettingsRow(
-            theme: theme,
-            label: l10n.temperatureUnit,
-            child: const TemperatureUnitSelector(),
-          ),
-          _divider(theme),
-          _SettingsRow(
-            theme: theme,
-            label: l10n.modePreference,
-            child: const ModePreferenceSelector(),
-          ),
-          _divider(theme),
-          _SettingsRow(
-            theme: theme,
-            label: l10n.bedExitShutdown,
-            child: const BedExitShutdownSelector(),
-          ),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              l10n.generalSettings,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            _SettingsRow(
+              theme: theme,
+              label: l10n.language,
+              child: const LanguageSelector(),
+            ),
+            _divider(theme),
+            _SettingsRow(
+              theme: theme,
+              label: l10n.temperatureUnit,
+              child: const TemperatureUnitSelector(),
+            ),
+            _divider(theme),
+            _SettingsRow(
+              theme: theme,
+              label: l10n.modePreference,
+              child: const ModePreferenceSelector(),
+            ),
+            _divider(theme),
+            _SettingsRow(
+              theme: theme,
+              label: l10n.bedExitShutdown,
+              child: const BedExitShutdownSelector(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -122,7 +131,7 @@ class _SettingsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -149,40 +158,45 @@ class _FactoryResetRow extends StatelessWidget {
     return BlocBuilder<FactoryResetCubit, FactoryResetState>(
       builder: (context, state) {
         return Card(
-          child: InkWell(
-            onTap: state.isLoading ? null : () => _showConfirmDialog(context, l10n),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  Text(
-                    l10n.restoreFactorySettings,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.orange,
-                      fontWeight: FontWeight.w500,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: InkWell(
+              onTap: state.isLoading
+                  ? null
+                  : () => _showConfirmDialog(context, l10n),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                child: Row(
+                  children: [
+                    Text(
+                      l10n.restoreFactorySettings,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    child: state.isLoading
-                        ? const SizedBox(
-                            key: ValueKey('spinner'),
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.red,
+                    const Spacer(),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: state.isLoading
+                          ? const SizedBox(
+                              key: ValueKey('spinner'),
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.red,
+                              ),
+                            )
+                          : const Icon(
+                              key: ValueKey('arrow'),
+                              Icons.arrow_forward_ios,
+                              size: 16,
+                              color: AppColors.textHint,
                             ),
-                          )
-                        : const Icon(
-                            key: ValueKey('arrow'),
-                            Icons.arrow_forward_ios,
-                            size: 16,
-                            color: AppColors.textHint,
-                          ),
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

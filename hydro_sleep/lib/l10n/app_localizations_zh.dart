@@ -33,6 +33,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get myDevices => '我的设备';
 
   @override
+  String get generalSettings => '通用设置';
+
+  @override
   String get connected => '已连接';
 
   @override

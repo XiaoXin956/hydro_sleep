@@ -145,7 +145,7 @@ class SleepTempCurve extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 4),
                   child: Text(
                     _stageLabel(_stageKeys[value]!, l10n),
-                    style: const TextStyle(fontSize: 9, color: Color(0xFFBDBDBD)),
+                    style: const TextStyle(fontSize: 9, color: Color(0xFF616161)),
                   ),
                 );
               }

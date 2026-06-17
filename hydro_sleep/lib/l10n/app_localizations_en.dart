@@ -33,6 +33,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get myDevices => 'My Devices';
 
   @override
+  String get generalSettings => 'General Settings';
+
+  @override
   String get connected => 'Connected';
 
   @override

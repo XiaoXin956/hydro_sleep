@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 日期切换头
@@ -39,87 +38,23 @@ class _DateHeaderState extends State<DateHeader> {
     final l10n = AppLocalizations.of(context)!;
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left, size: 28),
-              onPressed: _previousDay,
-            ),
-            Text(
-              _formatDate(_selectedDate, l10n),
-              style: theme.textTheme.titleMedium,
-            ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right, size: 28),
-              onPressed: _nextDay,
-            ),
-          ],
+        IconButton(
+          icon: const Icon(Icons.chevron_left, size: 28),
+          onPressed: _previousDay,
         ),
-        MenuAnchor(
-          builder: (context, controller, child) {
-            return GestureDetector(
-              onTap: () {
-                if (controller.isOpen) {
-                  controller.close();
-                } else {
-                  controller.open();
-                }
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      l10n.dateDay,
-                      style: TextStyle(
-                        color: AppColors.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const Icon(
-                      Icons.arrow_drop_down,
-                      color: AppColors.primary,
-                      size: 18,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-          menuChildren: [
-            _PeriodMenuItem(l10n.dateDay, () {}),
-            _PeriodMenuItem(l10n.dateWeek, () {}),
-            _PeriodMenuItem(l10n.dateMonth, () {}),
-            _PeriodMenuItem(l10n.dateYear, () {}),
-          ],
+        const SizedBox(width: 8),
+        Text(
+          _formatDate(_selectedDate, l10n),
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          icon: const Icon(Icons.chevron_right, size: 28),
+          onPressed: _nextDay,
         ),
       ],
-    );
-  }
-}
-
-class _PeriodMenuItem extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _PeriodMenuItem(this.label, this.onTap);
-
-  @override
-  Widget build(BuildContext context) {
-    return MenuItemButton(
-      onPressed: onTap,
-      child: Text(label),
     );
   }
 }

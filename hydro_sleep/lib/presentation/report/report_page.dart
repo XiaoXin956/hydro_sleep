@@ -1,52 +1,94 @@
 import 'package:flutter/material.dart';
+import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
-import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
-import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
-import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dart';
-import 'package:hydro_sleep/presentation/report/widgets/sleep_temp_curve.dart';
-import 'package:hydro_sleep/presentation/report/widgets/heart_rate_chart.dart';
+import 'package:hydro_sleep/presentation/report/daily/daily_report_content.dart';
+import 'package:hydro_sleep/presentation/report/weekly/weekly_report_content.dart';
+import 'package:hydro_sleep/presentation/report/monthly/monthly_report_content.dart';
+import 'package:hydro_sleep/presentation/report/yearly/yearly_report_content.dart';
 
-/// 报告页
-class ReportPage extends StatelessWidget {
+/// 报告页 — 日/周/月/年 Tab 切换
+class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
   @override
+  State<ReportPage> createState() => _ReportPageState();
+}
+
+class _ReportPageState extends State<ReportPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          pinned: true,
-          expandedHeight: 60,
-          flexibleSpace: FlexibleSpaceBar(
-            title: Text(
-              AppLocalizations.of(context)!.reportTitle,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+    final l10n = AppLocalizations.of(context)!;
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        splashFactory: NoSplash.splashFactory,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+      ),
+      child: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 100,
+            flexibleSpace: FlexibleSpaceBar(
+              title: Text(
+                l10n.reportTitle,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              titlePadding: const EdgeInsets.only(left: 16, bottom: 48),
+              centerTitle: false,
             ),
-            titlePadding: const EdgeInsets.only(left: 16, bottom: 12),
-            centerTitle: false,
+            bottom: TabBar(
+              controller: _tabController,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+              indicatorSize: TabBarIndicatorSize.label,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+              ),
+              tabs: [
+                Tab(text: l10n.dateDay),
+                Tab(text: l10n.dateWeek),
+                Tab(text: l10n.dateMonth),
+                Tab(text: l10n.dateYear),
+              ],
+            ),
           ),
+        ],
+        body: TabBarView(
+          controller: _tabController,
+          physics: const NeverScrollableScrollPhysics(),
+          children: const [
+            DailyReportContent(),
+            WeeklyReportContent(),
+            MonthlyReportContent(),
+            YearlyReportContent(),
+          ],
         ),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final items = <Widget>[
-                const DateHeader(),
-                const SizedBox(height: 16),
-                const SleepScoreCard(),
-                const SizedBox(height: 16),
-                const SleepStagesSummary(),
-                const SizedBox(height: 16),
-                const SleepTempCurve(),
-                const SizedBox(height: 16),
-                const HeartRateChart(),
-                const SizedBox(height: 40),
-              ];
-              return items[index];
-            }, childCount: 10),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

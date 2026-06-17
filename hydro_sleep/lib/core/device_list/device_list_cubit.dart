@@ -83,6 +83,11 @@ class DeviceListCubit extends Cubit<DeviceListState> {
         deviceName: 'SmartSleep Mini',
         lastConnectedAt: null,
       ),
+      HistoryDevice(
+        deviceId: 'UID-6C8D3B',
+        deviceName: 'SmartSleep Elite',
+        lastConnectedAt: null,
+      ),
     ];
   }
 }

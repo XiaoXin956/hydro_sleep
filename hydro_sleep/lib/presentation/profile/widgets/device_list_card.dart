@@ -5,19 +5,55 @@ import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 设备列表卡片
-class DeviceListCard extends StatelessWidget {
+class DeviceListCard extends StatefulWidget {
   const DeviceListCard({super.key});
+
+  @override
+  State<DeviceListCard> createState() => _DeviceListCardState();
+}
+
+class _DeviceListCardState extends State<DeviceListCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _heightFactor;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _heightFactor = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeInOut,
+    );
+  }
+
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    return BlocBuilder<DeviceListCubit, DeviceListState>(
+    return BlocConsumer<DeviceListCubit, DeviceListState>(
+      listenWhen: (prev, curr) => prev.expanded != curr.expanded,
+      listener: (_, state) {
+        state.expanded ? _controller.forward() : _controller.reverse();
+      },
       builder: (context, state) {
-        final visible = state.visibleDevices;
+        final overflowDevices = state.devices.length > 3
+            ? state.devices.sublist(3)
+            : <dynamic>[];
 
         return Card(
+          clipBehavior: Clip.antiAlias,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -28,37 +64,45 @@ class DeviceListCard extends StatelessWidget {
                   style: theme.textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
-                ...visible.asMap().entries.map((entry) {
+                ...state.devices.take(3).toList().asMap().entries.map((entry) {
                   final index = entry.key;
                   final device = entry.value;
-                  final isLast = index == visible.length - 1;
                   return Column(
                     children: [
                       if (index > 0) _divider(theme),
-                      AnimatedCrossFade(
-                        firstChild: const SizedBox.shrink(),
-                        secondChild: _DeviceTile(
-                          theme: theme,
-                          name: device.deviceName,
-                          connected: false, // BLE 预留，暂未连接
-                          l10n: l10n,
-                        ),
-                        firstCurve: Curves.easeOut,
-                        secondCurve: Curves.easeIn,
-                        sizeCurve: Curves.easeInOut,
-                        crossFadeState: isLast && state.expanded
-                            ? CrossFadeState.showSecond
-                            : CrossFadeState.showFirst,
-                        duration: const Duration(milliseconds: 300),
+                      _DeviceTile(
+                        theme: theme,
+                        name: device.deviceName,
+                        connected: false,
+                        l10n: l10n,
                       ),
                     ],
                   );
                 }),
+                // 纯高度动画：ClipRect + Align(heightFactor)
+                SizeTransition(
+                  sizeFactor: _heightFactor,
+                  axis: Axis.vertical,
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < overflowDevices.length; i++) ...[
+                        _divider(theme),
+                        _DeviceTile(
+                          theme: theme,
+                          name: overflowDevices[i].deviceName,
+                          connected: false,
+                          l10n: l10n,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
                 if (state.hasMore) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 4),
                   AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (Widget child, Animation<double> animation) {
+                    transitionBuilder:
+                        (Widget child, Animation<double> animation) {
                       final offsetTween = Tween<Offset>(
                         begin: const Offset(0.15, 0),
                         end: Offset.zero,

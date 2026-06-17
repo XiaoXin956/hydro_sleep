@@ -22,6 +22,7 @@ class AppColors {
 
   // 通用色
   static const Color temperatureCurve = Color(0xFFEF5350); // 温度曲线 - 红
+  static const Color heartRate = Color(0xFFE53935);        // 心率 - 红
 
   // 文字色
   static const Color textPrimary = Color(0xFF212121);

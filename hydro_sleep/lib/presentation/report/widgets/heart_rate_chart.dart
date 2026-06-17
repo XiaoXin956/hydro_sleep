@@ -83,7 +83,7 @@ class _SummaryItem extends StatelessWidget {
         Text(
           value,
           style: theme.textTheme.headlineMedium?.copyWith(
-            color: AppColors.primary,
+            color: AppColors.heartRate,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -174,15 +174,48 @@ LineChartData mainChartData({
           (i) => FlSpot(i.toDouble(), data[i]),
         ),
         isCurved: true,
-        color: AppColors.primary,
+        color: AppColors.heartRate,
         barWidth: 2,
         belowBarData: BarAreaData(
           show: true,
-          color: AppColors.primary.withValues(alpha: 0.1),
+          color: AppColors.heartRate.withValues(alpha: 0.1),
         ),
         dotData: const FlDotData(show: false),
       ),
     ],
+    lineTouchData: LineTouchData(
+      touchTooltipData: LineTouchTooltipData(
+        getTooltipColor: (_) => Colors.white,
+        getTooltipItems: (spots) => spots
+            .map(
+              (spot) => LineTooltipItem(
+                '${spot.y.toInt()} BPM',
+                TextStyle(
+                  color: AppColors.heartRate,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            )
+            .toList(),
+      ),
+      getTouchedSpotIndicator: (barData, spotIndexes) => spotIndexes
+          .map(
+            (_) => TouchedSpotIndicatorData(
+              FlLine(color: AppColors.heartRate, strokeWidth: 1),
+              FlDotData(
+                show: true,
+                getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                  radius: 4,
+                  color: AppColors.heartRate,
+                  strokeWidth: 2,
+                  strokeColor: Colors.white,
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    ),
     borderData: FlBorderData(show: false),
     minX: 0,
     maxX: (data.length - 1).toDouble(),

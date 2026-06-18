@@ -46,8 +46,20 @@ lib/
     home/home_page.dart               - Tab shell (BottomNavigationBar, 3 tabs)
     index/index_page.dart             - Home tab content
     index/widgets/                    - ConnectionStatusCard, ModeSelectionCard, TemperatureControlCard, ScheduleCard
-    report/report_page.dart           - Sleep report (score, stages, temp curve, heart rate charts)
+    report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly/Yearly)
     report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart
+    report/daily/
+      daily_report_content.dart
+      bloc/daily_report_cubit.dart
+    report/weekly/
+      weekly_report_content.dart
+      bloc/weekly_report_cubit.dart
+    report/monthly/
+      monthly_report_content.dart
+      bloc/monthly_report_cubit.dart
+    report/yearly/
+      yearly_report_content.dart
+      bloc/yearly_report_cubit.dart
     profile/profile_page.dart         - Settings (profile, device list, language, temp unit, mode preference, bed exit)
     profile/widgets/                  - ProfileCard, DeviceListCard, LanguageSelector, TemperatureUnitSelector, etc.
     device_search/device_search_page.dart - BLE device search (placeholder, no BLE integration yet)

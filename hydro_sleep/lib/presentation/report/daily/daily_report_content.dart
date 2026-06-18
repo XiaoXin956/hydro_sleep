@@ -18,8 +18,8 @@ class DailyReportContent extends StatelessWidget {
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {
               final items = <Widget>[
-                const DateHeader(),
-                const SizedBox(height: 16),
+                const DateHeader(period: DatePeriod.day),
+                const SizedBox(height: 4),
                 const SleepScoreCard(),
                 const SizedBox(height: 16),
                 const SleepStagesSummary(),

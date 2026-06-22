@@ -10,6 +10,7 @@ import 'package:hydro_sleep/core/theme/theme_provider.dart';
 import 'package:provider/provider.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
     MultiProvider(
       providers: [

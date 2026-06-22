@@ -14,7 +14,7 @@ class DailyReportContent extends StatelessWidget {
     return CustomScrollView(
       slivers: [
         SliverPadding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(6),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {
               final items = <Widget>[

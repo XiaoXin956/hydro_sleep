@@ -76,8 +76,8 @@ class _DeviceListCardState extends State<DeviceListCard>
                       _DeviceTile(
                         theme: theme,
                         name: device.deviceName,
-                        isConnecting:
-                            isCurrentDevice && connectState.isConnecting,
+                        isConnecting: isCurrentDevice &&
+                            (connectState.isConnecting || connectState.isReconnecting),
                         isConnected:
                             isCurrentDevice && connectState.isConnected,
                         onDisconnect: isCurrentDevice && connectState.isConnected
@@ -99,9 +99,9 @@ class _DeviceListCardState extends State<DeviceListCard>
                         _DeviceTile(
                           theme: theme,
                           name: overflowDevices[i].deviceName,
-                          isConnecting: connectState.remoteId ==
-                                  overflowDevices[i].deviceId &&
-                              connectState.isConnecting,
+                          isConnecting: (connectState.remoteId ==
+                                      overflowDevices[i].deviceId) &&
+                                  (connectState.isConnecting || connectState.isReconnecting),
                           isConnected: connectState.remoteId ==
                                   overflowDevices[i].deviceId &&
                               connectState.isConnected,

@@ -87,5 +87,6 @@
   "done": "Done",
   "disconnect": "Disconnect",
   "permissionDenied": "Permission denied. Please enable Bluetooth and Location in Settings.",
-  "openSettings": "Open Settings"
+  "openSettings": "Open Settings",
+  "reconnecting": "Reconnecting…"
 }

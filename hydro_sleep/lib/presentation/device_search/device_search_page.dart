@@ -35,6 +35,9 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
         final scanCubit = context.read<BleScanCubit>();
         if (connectState.isConnecting && connectState.remoteId != null) {
           scanCubit.markConnecting(connectState.remoteId!);
+        } else if (connectState.status == BleConnectStatus.reconnecting &&
+            connectState.remoteId != null) {
+          scanCubit.markConnecting(connectState.remoteId!);
         } else if (connectState.isConnected && connectState.remoteId != null) {
           scanCubit.markConnected(connectState.remoteId!);
           context.read<DeviceListCubit>().refresh();
@@ -98,7 +101,8 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
                   final isCurrentDevice =
                       connectState.remoteId == device.deviceId;
                   final isConnecting =
-                      isCurrentDevice && connectState.isConnecting;
+                      isCurrentDevice &&
+                          (connectState.isConnecting || connectState.isReconnecting);
                   final isConnected =
                       isCurrentDevice && connectState.isConnected;
 

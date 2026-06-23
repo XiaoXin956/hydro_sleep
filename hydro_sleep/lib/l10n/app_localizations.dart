@@ -541,6 +541,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Open Settings'**
   String get openSettings;
+
+  /// No description provided for @reconnecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Reconnecting…'**
+  String get reconnecting;
 }
 
 class _AppLocalizationsDelegate

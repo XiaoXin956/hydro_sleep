@@ -233,4 +233,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get openSettings => '打开设置';
+
+  @override
+  String get reconnecting => '正在重连…';
 }

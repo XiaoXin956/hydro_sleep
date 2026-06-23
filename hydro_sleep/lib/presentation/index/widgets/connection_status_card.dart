@@ -17,6 +17,7 @@ class ConnectionStatusCard extends StatelessWidget {
 
     final isConnected = connectState.isConnected;
     final isConnecting = connectState.isConnecting;
+    final isReconnecting = connectState.isReconnecting;
     final deviceName = connectState.deviceName;
 
     return Card(
@@ -30,12 +31,12 @@ class ConnectionStatusCard extends StatelessWidget {
                 Icon(
                   isConnected
                       ? Icons.bluetooth_connected
-                      : isConnecting
+                      : isConnecting || isReconnecting
                           ? Icons.bluetooth_searching
                           : Icons.bluetooth_disabled,
                   color: isConnected
                       ? AppColors.success
-                      : isConnecting
+                      : isConnecting || isReconnecting
                           ? AppColors.primary
                           : AppColors.textSecondary,
                   size: 20,
@@ -46,11 +47,13 @@ class ConnectionStatusCard extends StatelessWidget {
                       ? l10n.deviceConnected
                       : isConnecting
                           ? l10n.connecting
-                          : l10n.notConnected,
+                          : isReconnecting
+                              ? l10n.reconnecting
+                              : l10n.notConnected,
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: isConnected
                         ? AppColors.success
-                        : isConnecting
+                        : isConnecting || isReconnecting
                             ? AppColors.primary
                             : AppColors.textSecondary,
                     fontWeight: FontWeight.w600,
@@ -59,7 +62,7 @@ class ConnectionStatusCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            _buildActions(context, theme, l10n, isConnected, isConnecting, deviceName),
+            _buildActions(context, theme, l10n, isConnected, isConnecting || isReconnecting, deviceName),
           ],
         ),
       ),

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hydro_sleep/domain/models/scanned_device.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -11,10 +12,12 @@ class BleService {
 
   Future<bool> isBluetoothOn() async {
     final state = await FlutterBluePlus.adapterState.first;
+    debugPrint('[蓝牙服务] 蓝牙状态: $state');
     return state == BluetoothAdapterState.on;
   }
 
   Future<void> turnOn() async {
+    debugPrint('[蓝牙服务] 请求开启蓝牙');
     await FlutterBluePlus.turnOn();
   }
 
@@ -29,14 +32,17 @@ class BleService {
     ];
 
     final statuses = await permissions.request();
-    return statuses.values.every(
+    final granted = statuses.values.every(
       (s) => s.isGranted || s.isLimited,
     );
+    debugPrint('[蓝牙服务] 权限请求结果: granted=$granted');
+    return granted;
   }
 
   Future<void> startScan({
     Duration timeout = const Duration(seconds: 15),
   }) async {
+    debugPrint('[蓝牙服务] 开始扫描, 超时=${timeout.inSeconds}秒');
     await FlutterBluePlus.startScan(
       timeout: timeout,
       androidScanMode: AndroidScanMode.lowLatency,
@@ -44,6 +50,7 @@ class BleService {
   }
 
   Future<void> stopScan() async {
+    debugPrint('[蓝牙服务] 停止扫描');
     await FlutterBluePlus.stopScan();
   }
 
@@ -59,18 +66,26 @@ class BleService {
   Future<void> connect(
     String remoteId, {
     Duration timeout = const Duration(seconds: 15),
+    bool autoConnect = false,
   }) async {
+    debugPrint(
+      '[蓝牙服务] 发起连接: $remoteId, 自动连接=$autoConnect, 超时=${timeout.inSeconds}秒',
+    );
     final device = BluetoothDevice.fromId(remoteId);
     await device.connect(
       timeout: timeout,
-      autoConnect: false,
+      autoConnect: autoConnect,
+      mtu: null,
       license: License.nonprofit,
     );
+    debugPrint('[蓝牙服务] 连接完成: $remoteId');
   }
 
   Future<void> disconnect(String remoteId) async {
+    debugPrint('[蓝牙服务] 断开连接: $remoteId');
     final device = BluetoothDevice.fromId(remoteId);
     await device.disconnect();
+    debugPrint('[蓝牙服务] 断开连接完成: $remoteId');
   }
 
   Stream<BluetoothConnectionState> connectionState(String remoteId) {

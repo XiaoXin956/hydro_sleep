@@ -61,5 +61,15 @@
   "cancel": "取消",
   "confirm": "确认",
   "showMore": "更多",
-  "showLess": "收起"
+  "showLess": "收起",
+  "bluetoothOff": "蓝牙未开启",
+  "turnOnBluetooth": "开启蓝牙",
+  "noDevicesFound": "未发现设备",
+  "scanning": "扫描中…",
+  "connecting": "正在连接…",
+  "connectSuccess": "连接成功",
+  "connectFailed": "连接失败",
+  "retry": "重试",
+  "done": "完成",
+  "disconnect": "断开连接"
 }

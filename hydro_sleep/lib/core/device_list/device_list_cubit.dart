@@ -56,6 +56,11 @@ class DeviceListCubit extends Cubit<DeviceListState> {
     emit(state.copyWith(expanded: !state.expanded));
   }
 
+  Future<void> refresh() async {
+    emit(state.copyWith(devices: const []));
+    await _loadDevices();
+  }
+
   List<HistoryDevice> _mockDevices() {
     return const [
       HistoryDevice(

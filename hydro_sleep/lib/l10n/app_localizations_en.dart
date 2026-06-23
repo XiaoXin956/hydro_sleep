@@ -198,4 +198,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get showLess => 'Less';
+
+  @override
+  String get bluetoothOff => 'Bluetooth is off';
+
+  @override
+  String get turnOnBluetooth => 'Turn on Bluetooth';
+
+  @override
+  String get noDevicesFound => 'No devices found';
+
+  @override
+  String get scanning => 'Scanning…';
+
+  @override
+  String get connecting => 'Connecting…';
+
+  @override
+  String get connectSuccess => 'Connected successfully';
+
+  @override
+  String get connectFailed => 'Connection failed';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get done => 'Done';
+
+  @override
+  String get disconnect => 'Disconnect';
 }

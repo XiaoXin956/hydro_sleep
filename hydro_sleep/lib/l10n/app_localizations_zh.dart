@@ -197,4 +197,34 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get showLess => '收起';
+
+  @override
+  String get bluetoothOff => '蓝牙未开启';
+
+  @override
+  String get turnOnBluetooth => '开启蓝牙';
+
+  @override
+  String get noDevicesFound => '未发现设备';
+
+  @override
+  String get scanning => '扫描中…';
+
+  @override
+  String get connecting => '正在连接…';
+
+  @override
+  String get connectSuccess => '连接成功';
+
+  @override
+  String get connectFailed => '连接失败';
+
+  @override
+  String get retry => '重试';
+
+  @override
+  String get done => '完成';
+
+  @override
+  String get disconnect => '断开连接';
 }

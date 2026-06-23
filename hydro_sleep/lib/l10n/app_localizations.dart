@@ -469,6 +469,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Less'**
   String get showLess;
+
+  /// No description provided for @bluetoothOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth is off'**
+  String get bluetoothOff;
+
+  /// No description provided for @turnOnBluetooth.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn on Bluetooth'**
+  String get turnOnBluetooth;
+
+  /// No description provided for @noDevicesFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No devices found'**
+  String get noDevicesFound;
+
+  /// No description provided for @scanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Scanning…'**
+  String get scanning;
+
+  /// No description provided for @connecting.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting…'**
+  String get connecting;
+
+  /// No description provided for @connectSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected successfully'**
+  String get connectSuccess;
+
+  /// No description provided for @connectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed'**
+  String get connectFailed;
+
+  /// No description provided for @retry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get retry;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @disconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get disconnect;
 }
 
 class _AppLocalizationsDelegate

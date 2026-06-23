@@ -75,5 +75,15 @@
   "cancel": "Cancel",
   "confirm": "Confirm",
   "showMore": "More",
-  "showLess": "Less"
+  "showLess": "Less",
+  "bluetoothOff": "Bluetooth is off",
+  "turnOnBluetooth": "Turn on Bluetooth",
+  "noDevicesFound": "No devices found",
+  "scanning": "Scanning…",
+  "connecting": "Connecting…",
+  "connectSuccess": "Connected successfully",
+  "connectFailed": "Connection failed",
+  "retry": "Retry",
+  "done": "Done",
+  "disconnect": "Disconnect"
 }

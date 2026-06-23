@@ -6,8 +6,10 @@ import 'package:hydro_sleep/core/bluetooth/ble_scan_cubit.dart';
 import 'package:hydro_sleep/core/device_list/device_list_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/data/storage/secure_storage_service.dart';
+import 'package:hydro_sleep/domain/models/history_device.dart';
 import 'package:hydro_sleep/domain/models/scanned_device.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class DeviceSearchPage extends StatefulWidget {
   const DeviceSearchPage({super.key});
@@ -39,6 +41,9 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
           SecureStorageService().saveLastDeviceId(connectState.remoteId!);
         } else if (connectState.isFailed) {
           scanCubit.markConnectFailed();
+        } else if (connectState.status == BleConnectStatus.disconnected &&
+            connectState.remoteId != null) {
+          scanCubit.markDisconnected(connectState.remoteId!);
         }
       },
       child: Scaffold(
@@ -67,6 +72,8 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
     ThemeData theme,
     AppLocalizations l10n,
   ) {
+    final connectState = context.watch<BleConnectCubit>().state;
+
     return BlocBuilder<DeviceListCubit, DeviceListState>(
       builder: (context, state) {
         if (state.devices.isEmpty) {
@@ -88,6 +95,13 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
                 ),
                 const SizedBox(height: 8),
                 ...state.devices.map((device) {
+                  final isCurrentDevice =
+                      connectState.remoteId == device.deviceId;
+                  final isConnecting =
+                      isCurrentDevice && connectState.isConnecting;
+                  final isConnected =
+                      isCurrentDevice && connectState.isConnected;
+
                   return Card(
                     margin: const EdgeInsets.only(bottom: 8),
                     child: ListTile(
@@ -106,24 +120,12 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
                       ),
                       title: Text(device.deviceName),
                       subtitle: Text(device.deviceId),
-                      trailing: ElevatedButton(
-                        onPressed: () => _showConfirmDialog(
-                          context,
-                          ScannedDevice(
-                            remoteId: device.deviceId,
-                            name: device.deviceName,
-                            rssi: 0,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                        ),
-                        child: Text(l10n.connect),
+                      trailing: _buildHistoryTrailing(
+                        context,
+                        l10n,
+                        device,
+                        isConnecting: isConnecting,
+                        isConnected: isConnected,
                       ),
                     ),
                   );
@@ -133,6 +135,67 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildHistoryTrailing(
+    BuildContext context,
+    AppLocalizations l10n,
+    HistoryDevice device, {
+    required bool isConnecting,
+    required bool isConnected,
+  }) {
+    if (isConnecting) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    if (isConnected) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            l10n.deviceConnected,
+            style: TextStyle(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: () => context.read<BleConnectCubit>().disconnect(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              l10n.disconnect,
+              style: TextStyle(color: Colors.red.shade400, fontSize: 13),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ElevatedButton(
+      onPressed: () => _showConfirmDialog(
+        context,
+        ScannedDevice(
+          remoteId: device.deviceId,
+          name: device.deviceName,
+          rssi: 0,
+        ),
+      ),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      ),
+      child: Text(l10n.connect),
     );
   }
 
@@ -199,7 +262,29 @@ class _DeviceSearchPageState extends State<DeviceSearchPage> {
           return SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(32),
-              child: Center(child: Text(bleState.error!)),
+              child: Column(
+                children: [
+                  const Icon(Icons.lock_outline, size: 48),
+                  const SizedBox(height: 8),
+                  Text(
+                    bleState.error == 'permissionDenied'
+                        ? l10n.permissionDenied
+                        : bleState.error!,
+                    textAlign: TextAlign.center,
+                  ),
+                  if (bleState.error == 'permissionDenied') ...[
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () => openAppSettings(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(l10n.openSettings),
+                    ),
+                  ],
+                ],
+              ),
             ),
           );
         }
@@ -324,15 +409,26 @@ class _DeviceTile extends StatelessWidget {
                 height: 20,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            else if (isConnected)
+            else if (isConnected) ...[
               Text(
                 l10n.deviceConnected,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w500,
                 ),
-              )
-            else
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => context.read<BleConnectCubit>().disconnect(),
+                child: Text(
+                  l10n.disconnect,
+                  style: TextStyle(
+                    color: Colors.red.shade400,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ] else
               ElevatedButton(
                 onPressed: onTap,
                 style: ElevatedButton.styleFrom(

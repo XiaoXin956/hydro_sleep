@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_scan_cubit.dart';
 import 'package:hydro_sleep/presentation/device_search/device_search_page.dart';
 import 'package:hydro_sleep/presentation/home/home_page.dart';
@@ -60,11 +59,8 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/search',
       name: 'search',
-      builder: (context, state) => MultiBlocProvider(
-        providers: [
-          BlocProvider(create: (_) => BleScanCubit()),
-          BlocProvider(create: (_) => BleConnectCubit()),
-        ],
+      builder: (context, state) => BlocProvider(
+        create: (_) => BleScanCubit(),
         child: const DeviceSearchPage(),
       ),
     ),

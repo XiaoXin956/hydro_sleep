@@ -84,6 +84,13 @@ class BleScanCubit extends Cubit<BleScanState> {
     await _bleService.stopScan();
     emit(state.copyWith(devices: const [], error: null));
 
+    // 请求运行时权限
+    final granted = await _bleService.requestPermissions();
+    if (!granted) {
+      emit(state.copyWith(error: 'permissionDenied'));
+      return;
+    }
+
     final isOn = await _bleService.isBluetoothOn();
     if (!isOn) {
       try {
@@ -129,6 +136,14 @@ class BleScanCubit extends Cubit<BleScanState> {
 
   void markConnectFailed() {
     emit(state.copyWith(connectingId: null));
+  }
+
+  void markDisconnected(String remoteId) {
+    emit(
+      state.copyWith(
+        connectedIds: state.connectedIds.difference({remoteId}),
+      ),
+    );
   }
 
   @override

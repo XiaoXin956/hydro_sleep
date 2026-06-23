@@ -41,14 +41,7 @@ class DeviceListCubit extends Cubit<DeviceListState> {
   }
 
   Future<void> _loadDevices() async {
-    var devices = await DeviceRepository.getAllHistoryDevices();
-    // 本地无数据时填充测试数据
-    if (devices.isEmpty) {
-      devices = _mockDevices();
-      for (final d in devices) {
-        await DeviceRepository.saveHistoryDevice(d);
-      }
-    }
+    final devices = await DeviceRepository.getAllHistoryDevices();
     emit(state.copyWith(devices: devices));
   }
 
@@ -59,40 +52,5 @@ class DeviceListCubit extends Cubit<DeviceListState> {
   Future<void> refresh() async {
     emit(state.copyWith(devices: const []));
     await _loadDevices();
-  }
-
-  List<HistoryDevice> _mockDevices() {
-    return const [
-      HistoryDevice(
-        deviceId: 'UID-8A3F2B',
-        deviceName: 'SmartSleep Pro',
-        lastConnectedAt: null,
-      ),
-      HistoryDevice(
-        deviceId: 'UID-9C1E4D',
-        deviceName: 'SmartSleep Lite',
-        lastConnectedAt: null,
-      ),
-      HistoryDevice(
-        deviceId: 'UID-3B2C8E',
-        deviceName: 'SmartSleep Pro (旧)',
-        lastConnectedAt: null,
-      ),
-      HistoryDevice(
-        deviceId: 'UID-5D7A1F',
-        deviceName: 'SmartSleep Basic',
-        lastConnectedAt: null,
-      ),
-      HistoryDevice(
-        deviceId: 'UID-7F2E9A',
-        deviceName: 'SmartSleep Mini',
-        lastConnectedAt: null,
-      ),
-      HistoryDevice(
-        deviceId: 'UID-6C8D3B',
-        deviceName: 'SmartSleep Elite',
-        lastConnectedAt: null,
-      ),
-    ];
   }
 }

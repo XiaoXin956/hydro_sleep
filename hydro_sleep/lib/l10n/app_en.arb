@@ -85,5 +85,7 @@
   "connectFailed": "Connection failed",
   "retry": "Retry",
   "done": "Done",
-  "disconnect": "Disconnect"
+  "disconnect": "Disconnect",
+  "permissionDenied": "Permission denied. Please enable Bluetooth and Location in Settings.",
+  "openSettings": "Open Settings"
 }

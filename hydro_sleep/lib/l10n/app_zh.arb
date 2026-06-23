@@ -71,5 +71,7 @@
   "connectFailed": "连接失败",
   "retry": "重试",
   "done": "完成",
-  "disconnect": "断开连接"
+  "disconnect": "断开连接",
+  "permissionDenied": "权限被拒绝，请在设置中开启蓝牙和定位权限",
+  "openSettings": "打开设置"
 }

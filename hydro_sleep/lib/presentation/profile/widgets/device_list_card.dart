@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/device_list/device_list_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
@@ -30,7 +31,6 @@ class _DeviceListCardState extends State<DeviceListCard>
     );
   }
 
-
   @override
   void dispose() {
     _controller.dispose();
@@ -41,6 +41,7 @@ class _DeviceListCardState extends State<DeviceListCard>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final connectState = context.watch<BleConnectCubit>().state;
 
     return BlocConsumer<DeviceListCubit, DeviceListState>(
       listenWhen: (prev, curr) => prev.expanded != curr.expanded,
@@ -67,13 +68,21 @@ class _DeviceListCardState extends State<DeviceListCard>
                 ...state.devices.take(3).toList().asMap().entries.map((entry) {
                   final index = entry.key;
                   final device = entry.value;
+                  final isCurrentDevice =
+                      connectState.remoteId == device.deviceId;
                   return Column(
                     children: [
                       if (index > 0) _divider(theme),
                       _DeviceTile(
                         theme: theme,
                         name: device.deviceName,
-                        connected: false,
+                        isConnecting:
+                            isCurrentDevice && connectState.isConnecting,
+                        isConnected:
+                            isCurrentDevice && connectState.isConnected,
+                        onDisconnect: isCurrentDevice && connectState.isConnected
+                            ? () => context.read<BleConnectCubit>().disconnect()
+                            : null,
                         l10n: l10n,
                       ),
                     ],
@@ -90,7 +99,18 @@ class _DeviceListCardState extends State<DeviceListCard>
                         _DeviceTile(
                           theme: theme,
                           name: overflowDevices[i].deviceName,
-                          connected: false,
+                          isConnecting: connectState.remoteId ==
+                                  overflowDevices[i].deviceId &&
+                              connectState.isConnecting,
+                          isConnected: connectState.remoteId ==
+                                  overflowDevices[i].deviceId &&
+                              connectState.isConnected,
+                          onDisconnect: connectState.remoteId ==
+                                      overflowDevices[i].deviceId &&
+                                  connectState.isConnected
+                              ? () =>
+                                  context.read<BleConnectCubit>().disconnect()
+                              : null,
                           l10n: l10n,
                         ),
                       ],
@@ -164,20 +184,22 @@ class _DeviceListCardState extends State<DeviceListCard>
 class _DeviceTile extends StatelessWidget {
   final ThemeData theme;
   final String name;
-  final bool connected;
+  final bool isConnecting;
+  final bool isConnected;
+  final VoidCallback? onDisconnect;
   final AppLocalizations l10n;
 
   const _DeviceTile({
     required this.theme,
     required this.name,
-    required this.connected,
     required this.l10n,
+    this.isConnecting = false,
+    this.isConnected = false,
+    this.onDisconnect,
   });
 
   @override
   Widget build(BuildContext context) {
-    final statusText = connected ? l10n.connected : l10n.disconnected;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -186,13 +208,15 @@ class _DeviceTile extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: isConnected
+                  ? AppColors.success.withValues(alpha: 0.1)
+                  : AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.bluetooth,
+              isConnected ? Icons.bluetooth_connected : Icons.bluetooth,
               size: 20,
-              color: AppColors.primary,
+              color: isConnected ? AppColors.success : AppColors.primary,
             ),
           ),
           const SizedBox(width: 12),
@@ -207,25 +231,60 @@ class _DeviceTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: connected ? AppColors.success : AppColors.error,
-                        shape: BoxShape.circle,
+                if (isConnecting)
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: AppColors.primary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      statusText,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: connected ? AppColors.success : AppColors.error,
+                      const SizedBox(width: 6),
+                      Text(
+                        l10n.connecting,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.primary,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  )
+                else
+                  Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color:
+                              isConnected ? AppColors.success : AppColors.error,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isConnected ? l10n.connected : l10n.disconnected,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color:
+                              isConnected ? AppColors.success : AppColors.error,
+                        ),
+                      ),
+                      if (onDisconnect != null) ...[
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: onDisconnect,
+                          child: Text(
+                            l10n.disconnect,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.red.shade400,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
               ],
             ),
           ),

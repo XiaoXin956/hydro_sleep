@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hydro_sleep/domain/models/scanned_device.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// BLE 通信服务，封装 flutter_blue_plus 静态调用
 class BleService {
@@ -13,6 +16,22 @@ class BleService {
 
   Future<void> turnOn() async {
     await FlutterBluePlus.turnOn();
+  }
+
+  /// 请求 BLE 扫描所需的运行时权限，返回是否全部授权
+  Future<bool> requestPermissions() async {
+    if (!Platform.isAndroid) return true;
+
+    final permissions = <Permission>[
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
+    ];
+
+    final statuses = await permissions.request();
+    return statuses.values.every(
+      (s) => s.isGranted || s.isLimited,
+    );
   }
 
   Future<void> startScan({

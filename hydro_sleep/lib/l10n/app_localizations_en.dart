@@ -228,4 +228,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get disconnect => 'Disconnect';
+
+  @override
+  String get permissionDenied =>
+      'Permission denied. Please enable Bluetooth and Location in Settings.';
+
+  @override
+  String get openSettings => 'Open Settings';
 }

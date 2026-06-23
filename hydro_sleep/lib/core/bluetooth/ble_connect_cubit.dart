@@ -1,8 +1,5 @@
-import 'dart:async';
-
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hydro_sleep/core/bluetooth/bluetooth_service.dart';
 import 'package:hydro_sleep/data/repositories/device_repository.dart';
 import 'package:hydro_sleep/domain/models/history_device.dart';
@@ -64,7 +61,6 @@ class BleConnectCubit extends Cubit<BleConnectState> {
         super(const BleConnectState());
 
   final BleService _bleService;
-  StreamSubscription? _connSub;
 
   Future<void> connect(ScannedDevice device) async {
     emit(
@@ -76,31 +72,10 @@ class BleConnectCubit extends Cubit<BleConnectState> {
       ),
     );
 
-    _connSub?.cancel();
-    _connSub = _bleService.connectionState(device.remoteId).listen((
-      connState,
-    ) async {
-      if (connState == BluetoothConnectionState.connected) {
-        await _saveHistory(device);
-        emit(state.copyWith(status: BleConnectStatus.connected, error: null));
-      } else if (connState == BluetoothConnectionState.disconnected) {
-        if (state.isConnecting) {
-          emit(
-            state.copyWith(
-              status: BleConnectStatus.failed,
-              error: 'disconnected',
-            ),
-          );
-        } else {
-          emit(
-            state.copyWith(status: BleConnectStatus.disconnected, error: null),
-          );
-        }
-      }
-    });
-
     try {
       await _bleService.connect(device.remoteId);
+      await _saveHistory(device);
+      emit(state.copyWith(status: BleConnectStatus.connected, error: null));
     } catch (e) {
       emit(state.copyWith(status: BleConnectStatus.failed, error: 'connectFailed'));
     }
@@ -127,11 +102,5 @@ class BleConnectCubit extends Cubit<BleConnectState> {
         lastConnectedAt: DateTime.now(),
       ),
     );
-  }
-
-  @override
-  Future<void> close() async {
-    await _connSub?.cancel();
-    return super.close();
   }
 }

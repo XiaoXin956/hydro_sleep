@@ -227,4 +227,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get disconnect => '断开连接';
+
+  @override
+  String get permissionDenied => '权限被拒绝，请在设置中开启蓝牙和定位权限';
+
+  @override
+  String get openSettings => '打开设置';
 }

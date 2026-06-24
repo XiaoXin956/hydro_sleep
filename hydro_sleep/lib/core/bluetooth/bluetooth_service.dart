@@ -75,7 +75,7 @@ class BleService {
     await device.connect(
       timeout: timeout,
       autoConnect: autoConnect,
-      mtu: null,
+      mtu: autoConnect ? null : 247,
       license: License.nonprofit,
     );
     debugPrint('[蓝牙服务] 连接完成: $remoteId');

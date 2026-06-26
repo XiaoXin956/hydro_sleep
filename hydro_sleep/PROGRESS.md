@@ -29,22 +29,41 @@
   - SecureStorageService 新增 bedExit shutdown 存储方法
   - 补充 l10n 字符串：factoryReset/showMore/showLess
 
+### 2026-06-17
+- [x] BLE 扫描功能（flutter_blue_plus 2.3.8）
+  - BleService：封装 FlutterBluePlus 静态 API（权限、扫描、结果流）
+  - BleScanCubit：扫描状态管理（idle/scanning/results），Android 动态权限处理
+  - ScannedDevice 模型（remoteId, name, rssi, connectable）
+  - DeviceSearchPage 接入 BleScanCubit，实时展示扫描设备列表
+- [x] BLE 连接与自动重连
+  - BleConnectCubit：连接生命周期（idle → connecting → connected → disconnected/reconnecting/failed）
+  - 断开检测：stream 监听 + 3s 定时轮询双保险
+  - 自动重连：maxRetries=3，autoConnect: true（后台重连），20s 超时，10s 间隔
+  - 蓝牙关闭自动清理所有连接状态
+  - 连接成功自动保存 HistoryDevice 到本地
+  - DeviceSearchPage 连接对话框（进度指示 → 连接成功/失败反馈）
+  - 首页 ConnectionStatusCard 同步显示 BLE 连接状态
+  - 修复 autoConnect 时 mtu 不兼容断言错误（mtu: autoConnect ? null : 247）
+
 ## 待完成
 
 ### BLoC 模块完善
 - [ ] ThemeCubit（替换当前 ChangeNotifier 实现）
-- [ ] DeviceBloc（BLE 设备连接状态管理）
 - [ ] SleepDataBloc（睡眠数据加载与缓存）
 
+### BLE 数据通信
+- [ ] BleFrameParser — BLE 帧解析（粘包/拆包处理，帧头 0xA5 0x5A，校验和验证）
+- [ ] BleDataCubit — BLE 数据状态管理（服务发现 → 通知订阅 → 帧解析 → 数据分发）
+- [ ] BleCmd — BLE 命令类型常量（0x81~0x94）
+- [ ] 扩展 BleService 添加数据通信方法（discoverServices/enableNotify/writeData）
+
 ### 功能开发
-- [ ] BLE 连接集成（flutter_blue_plus）
-- [ ] 实时数据采集与展示
+- [ ] 实时数据采集与展示（首页数据卡片填充）
 - [ ] 睡眠数据分析算法
 - [ ] 日期选择器（报告页 DateHeader）
 
 ### 平台适配
 - [ ] iOS 配置（Info.plist、权限声明）
-- [ ] Android 权限配置（蓝牙、位置）
 - [ ] 推送通知
 
 ## 技术栈
@@ -58,4 +77,5 @@
 | 本地存储 | isar_community 3.3.0 |
 | 安全存储 | flutter_secure_storage 10.3.1 |
 | 国际化 | flutter_localizations + intl 0.20.2 |
-| BLE | flutter_blue_plus 2.3.8（预留） |
+| BLE | flutter_blue_plus 2.3.8 |
+| 权限 | permission_handler 11.4.0 |

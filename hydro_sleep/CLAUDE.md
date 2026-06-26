@@ -11,13 +11,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `go_router` 17.3.0 for routing
 - `provider` + `flutter_bloc` for state management
 - `intl` 0.20.2 + `flutter_localizations` for i18n (EN default, ZH supported)
+- `flutter_blue_plus` 2.3.8 for BLE communication
+- `permission_handler` 11.4.0 for runtime permissions
 
 ## Directory Structure
 
 ```
 lib/
   app/app.dart              - App root widget (Provider + BlocProvider + MaterialApp.router)
-  main.dart                 - Entry point (MultiProvider: ThemeProvider, LocaleCubit, FactoryResetCubit, TempUnitCubit, BedExitCubit, DeviceListCubit)
+  main.dart                 - Entry point (MultiProvider: ThemeProvider, LocaleCubit, FactoryResetCubit, TempUnitCubit, BedExitCubit, DeviceListCubit, BleConnectCubit)
   routing/app_router.dart   - GoRouter config (Startup -> HomePage tabs -> Search)
   core/
     constants/app_constants.dart  - App-wide constants
@@ -28,6 +30,10 @@ lib/
       dark_theme.dart       - Dark theme
       theme_provider.dart   - ChangeNotifier for theme toggle
     utils/mock_data.dart    - Test/mock data for UI pages
+    bluetooth/
+      bluetooth_service.dart   - BleService: scan/connect/disconnect/connectionState (wraps flutter_blue_plus)
+      ble_scan_cubit.dart      - BleScanCubit: BLE scan state (scanning/scanResults/error), filtered by platform
+      ble_connect_cubit.dart   - BleConnectCubit: BLE connection lifecycle (connect/disconnect/auto-reconnect/断开检测)
   data/
     local/                  - Isar DB + models (build_runner generates .g.dart)
       isar_database.dart    - HydroSleepDatabase singleton
@@ -62,7 +68,7 @@ lib/
       bloc/yearly_report_cubit.dart
     profile/profile_page.dart         - Settings (profile, device list, language, temp unit, mode preference, bed exit)
     profile/widgets/                  - ProfileCard, DeviceListCard, LanguageSelector, TemperatureUnitSelector, etc.
-    device_search/device_search_page.dart - BLE device search (placeholder, no BLE integration yet)
+    device_search/device_search_page.dart - BLE device search & connect dialog (BleScanCubit + BleConnectCubit)
 ```
 
 ## Common Commands
@@ -97,6 +103,8 @@ flutter run
   - `TempUnitCubit` — `Cubit<String>`, °C/°F toggle, persists via `SecureStorageService`
   - `BedExitCubit` — `Cubit<String>`, bed exit shutdown timer, persists via `SecureStorageService`
   - `DeviceListCubit` — `DeviceListState` with `List<HistoryDevice>` + expand/collapse, loads from `DeviceRepository`
+  - `BleScanCubit` — BLE 扫描状态（scanning/scanResults/error），Android 平台动态权限处理
+  - `BleConnectCubit` — BLE 连接生命周期（connecting/connected/disconnecting/disconnected/reconnecting/failed），断开检测（stream + 3s 定时轮询），自动重连（maxRetries=3, autoConnect: true, 20s 超时, 10s 间隔），蓝牙关闭自动清理
 - **Internationalization**: ARB-based (`flutter gen-l10n`). English is default. Language persisted via `SecureStorageService.saveLanguage()`. `LocaleCubit` loads saved locale on startup. Use `AppLocalizations.of(context)!` to access translations.
 - **Data layer**: Two singletons - `HydroSleepDatabase` (Isar) and `SecureStorageService` (flutter_secure_storage). Repositories wrap these.
 - **Routing**: GoRouter with `StatefulShellRoute.indexedStack` for 3-tab home (Home/Report/Profile). Startup -> /home auto-navigates after 2s.
@@ -104,3 +112,4 @@ flutter run
 - **Flutter 3.44 API changes**: `CardTheme` -> `CardThemeData`, `SliverChildList.fixed` -> `SliverChildBuilderDelegate`, `StatefulNavigationShell` (not `StatefulShellNavigationShell`).
 - **Isar**: Models use `@collection` annotation (lowercase, from `isar_community`). Run `build_runner` after any model change. Models live in `lib/data/local/models/`.
 - **IMPORTANT**: After modifying **any file** under `lib/data/local/`, always run `flutter pub run build_runner build --delete-conflicting-outputs` to regenerate `.g.dart` files.
+- **BLE architecture**: `BleService` (singleton-like, created inside `BleConnectCubit`) wraps `flutter_blue_plus` static API. `BleScanCubit` manages scan lifecycle. `BleConnectCubit` manages connection lifecycle with auto-reconnect. All BLE cubits use debugPrint with `[蓝牙扫描]`/`[连接管理]`/`[蓝牙服务]` prefixes for debugging.

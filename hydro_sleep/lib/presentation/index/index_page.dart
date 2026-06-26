@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
+import 'package:hydro_sleep/presentation/index/widgets/ble_debug_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/connection_status_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/mode_selection_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/schedule_card.dart';
@@ -39,11 +40,13 @@ class IndexPage extends StatelessWidget {
                   const TemperatureControlCard(),
                   const SizedBox(height: 16),
                   const ScheduleCard(),
+                  const SizedBox(height: 16),
+                  const BleDebugCard(),
                   const SizedBox(height: 80),
                 ];
                 return items[index];
               },
-              childCount: 8,
+              childCount: 10,
             ),
           ),
         ),

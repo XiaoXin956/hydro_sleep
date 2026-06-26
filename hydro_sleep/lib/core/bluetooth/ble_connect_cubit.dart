@@ -160,7 +160,7 @@ class BleConnectCubit extends Cubit<BleConnectState> {
       if (state.status != BleConnectStatus.connected) return;
       try {
         final btState = await _bleService.connectionState(remoteId).first;
-        debugPrint('[连接管理] 定时轮询检查: $btState');
+        // debugPrint('[连接管理] 定时轮询检查: $btState');
         if (btState == BluetoothConnectionState.disconnected) {
           debugPrint('[连接管理] 轮询检测到断开, 用户主动断开=$_userDisconnecting');
           _connCheckTimer?.cancel();

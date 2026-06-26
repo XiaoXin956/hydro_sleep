@@ -93,6 +93,80 @@ class BleService {
     return device.connectionState;
   }
 
+  // --- Data Communication ---
+
+  BluetoothCharacteristic? _notifyChar;
+
+  /// 发现设备所有服务和特征值
+  Future<List<BluetoothService>> discoverServices(String remoteId) async {
+    debugPrint('[蓝牙服务] 发现服务: $remoteId');
+    final device = BluetoothDevice.fromId(remoteId);
+    final services = await device.discoverServices();
+    for (final s in services) {
+      debugPrint('[蓝牙服务]   Service: ${s.uuid}');
+      for (final c in s.characteristics) {
+        debugPrint(
+          '[蓝牙服务]     Char: ${c.uuid} '
+          'read=${c.properties.read} '
+          'write=${c.properties.write} '
+          'notify=${c.properties.notify} '
+          'indicate=${c.properties.indicate}',
+        );
+      }
+    }
+    return services;
+  }
+
+  /// 找到第一个支持 Notify 的特征值并缓存
+  BluetoothCharacteristic? findNotifyCharacteristic(
+    List<BluetoothService> services,
+  ) {
+    for (final s in services) {
+      for (final c in s.characteristics) {
+        if (c.properties.notify) {
+          _notifyChar = c;
+          debugPrint(
+            '[蓝牙服务] 找到 Notify 特征值: ${c.uuid} (service: ${s.uuid})',
+          );
+          return c;
+        }
+      }
+    }
+    debugPrint('[蓝牙服务] 未找到 Notify 特征值');
+    return null;
+  }
+
+  /// 开启 Notify
+  Future<void> enableNotify() async {
+    final char = _notifyChar;
+    if (char == null) {
+      debugPrint('[蓝牙服务] enableNotify 失败: 未找到特征值');
+      return;
+    }
+    debugPrint('[蓝牙服务] 开启 Notify: ${char.uuid}');
+    await char.setNotifyValue(true);
+  }
+
+  /// 关闭 Notify
+  Future<void> disableNotify() async {
+    final char = _notifyChar;
+    if (char == null) return;
+    debugPrint('[蓝牙服务] 关闭 Notify: ${char.uuid}');
+    try {
+      await char.setNotifyValue(false);
+    } catch (e) {
+      debugPrint('[蓝牙服务] 关闭 Notify 失败（设备可能已断开）: $e');
+    }
+  }
+
+  /// Notify 数据流
+  Stream<List<int>>? get onValueChanged => _notifyChar?.onValueReceived;
+
+  /// 清除缓存的特征值引用
+  void clearCharacteristicCache() {
+    _notifyChar = null;
+  }
+
   // --- Helpers ---
 
   static ScannedDevice _toDomain(ScanResult r) {

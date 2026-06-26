@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
@@ -24,6 +26,8 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
+    final currentTemp = deviceInfo?.workTemp;
 
     return Card(
       child: Padding(
@@ -37,9 +41,13 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
             ),
             const SizedBox(height: 16),
             Text(
-              l10n.currentTemp(22),
+              currentTemp != null
+                  ? l10n.currentTemp(currentTemp)
+                  : l10n.currentTemp(0),
               style: theme.textTheme.titleLarge?.copyWith(
-                color: AppColors.primary,
+                color: currentTemp != null
+                    ? AppColors.primary
+                    : AppColors.textHint,
                 fontWeight: FontWeight.bold,
               ),
             ),

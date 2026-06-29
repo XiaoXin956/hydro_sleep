@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:equatable/equatable.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/bluetooth/bluetooth_service.dart';
 import 'package:hydro_sleep/domain/models/device_info.dart';
@@ -62,11 +63,13 @@ class BleDataCubit extends Cubit<BleDataState> {
         _bleService = bleService ?? BleService(),
         super(const BleDataState()) {
     _connectSub = _connectCubit.stream.listen(_onConnectStateChanged);
+    _adapterSub = _bleService.adapterState.listen(_onAdapterStateChanged);
   }
 
   final BleConnectCubit _connectCubit;
   final BleService _bleService;
   StreamSubscription<BleConnectState>? _connectSub;
+  StreamSubscription<BluetoothAdapterState>? _adapterSub;
   StreamSubscription<List<int>>? _dataSub;
 
   static const _deviceInfoLength = 11;
@@ -82,6 +85,19 @@ class BleDataCubit extends Cubit<BleDataState> {
     } else if (connectState.status == BleConnectStatus.disconnected ||
         connectState.status == BleConnectStatus.failed) {
       _stopDataFlow();
+    }
+  }
+
+  void _onAdapterStateChanged(BluetoothAdapterState adapterState) {
+    debugPrint('[数据管理] 蓝牙适配器状态: $adapterState');
+    if (adapterState == BluetoothAdapterState.off) {
+      _dataSub?.cancel();
+      _dataSub = null;
+      _bleService.clearCharacteristicCache();
+      if (state.status != BleDataStatus.idle) {
+        debugPrint('[数据管理] 蓝牙已关闭，清理所有数据');
+        emit(const BleDataState());
+      }
     }
   }
 
@@ -190,6 +206,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   @override
   Future<void> close() {
     _connectSub?.cancel();
+    _adapterSub?.cancel();
     _dataSub?.cancel();
     _bleService.disableNotify();
     _bleService.clearCharacteristicCache();

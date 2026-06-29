@@ -188,6 +188,12 @@ abstract class AppLocalizations {
   /// **'Bed Exit Shutdown'**
   String get bedExitShutdown;
 
+  /// No description provided for @firmwareVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Firmware Version'**
+  String get firmwareVersion;
+
   /// No description provided for @restoreFactorySettings.
   ///
   /// In en, this message translates to:
@@ -445,6 +451,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'This will restore all settings to factory defaults. This action cannot be undone.'**
   String get factoryResetMessage;
+
+  /// No description provided for @factoryResetSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Factory reset completed'**
+  String get factoryResetSuccess;
+
+  /// No description provided for @factoryResetFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Factory reset failed, please try again'**
+  String get factoryResetFailed;
+
+  /// No description provided for @deviceNotConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Device not connected'**
+  String get deviceNotConnected;
 
   /// No description provided for @cancel.
   ///

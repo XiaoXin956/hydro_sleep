@@ -18,7 +18,6 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         BlocProvider(create: (_) => LocaleCubit()),
-        BlocProvider(create: (_) => FactoryResetCubit()),
         BlocProvider(create: (_) => TempUnitCubit()),
         BlocProvider(create: (_) => BedExitCubit()),
         BlocProvider(create: (_) => DeviceListCubit()),
@@ -26,6 +25,11 @@ void main() {
         BlocProvider(
           create: (ctx) => BleDataCubit(
             connectCubit: ctx.read<BleConnectCubit>(),
+          ),
+        ),
+        BlocProvider(
+          create: (ctx) => FactoryResetCubit(
+            dataCubit: ctx.read<BleDataCubit>(),
           ),
         ),
       ],

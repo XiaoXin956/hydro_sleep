@@ -4,6 +4,7 @@ import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_temp_curve.dart';
 import 'package:hydro_sleep/presentation/report/widgets/heart_rate_chart.dart';
+import 'package:hydro_sleep/presentation/report/widgets/retransmit_test_card.dart';
 
 /// 日报告内容
 class DailyReportContent extends StatelessWidget {
@@ -27,10 +28,12 @@ class DailyReportContent extends StatelessWidget {
                 const SleepTempCurve(),
                 const SizedBox(height: 16),
                 const HeartRateChart(),
+                const SizedBox(height: 16),
+                const RetransmitTestCard(),
                 const SizedBox(height: 40),
               ];
               return items[index];
-            }, childCount: 10),
+            }, childCount: 12),
           ),
         ),
       ],

@@ -54,6 +54,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get bedExitShutdown => '离床关机';
 
   @override
+  String get firmwareVersion => '固件版本';
+
+  @override
   String get restoreFactorySettings => '恢复出厂设置';
 
   @override
@@ -185,6 +188,15 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get factoryResetMessage => '此操作将恢复所有设置为出厂默认值，且不可撤销。';
+
+  @override
+  String get factoryResetSuccess => '恢复出厂设置成功';
+
+  @override
+  String get factoryResetFailed => '恢复出厂设置失败，请重试';
+
+  @override
+  String get deviceNotConnected => '未连接设备';
 
   @override
   String get cancel => '取消';

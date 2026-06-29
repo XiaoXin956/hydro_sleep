@@ -54,6 +54,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bedExitShutdown => 'Bed Exit Shutdown';
 
   @override
+  String get firmwareVersion => 'Firmware Version';
+
+  @override
   String get restoreFactorySettings => 'Restore Factory Settings';
 
   @override
@@ -186,6 +189,15 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get factoryResetMessage =>
       'This will restore all settings to factory defaults. This action cannot be undone.';
+
+  @override
+  String get factoryResetSuccess => 'Factory reset completed';
+
+  @override
+  String get factoryResetFailed => 'Factory reset failed, please try again';
+
+  @override
+  String get deviceNotConnected => 'Device not connected';
 
   @override
   String get cancel => 'Cancel';

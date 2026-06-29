@@ -96,6 +96,7 @@ class BleService {
   // --- Data Communication ---
 
   BluetoothCharacteristic? _notifyChar;
+  BluetoothCharacteristic? _writeChar;
 
   /// 发现设备所有服务和特征值
   Future<List<BluetoothService>> discoverServices(String remoteId) async {
@@ -136,6 +137,38 @@ class BleService {
     return null;
   }
 
+  /// 找到第一个支持 Write 的特征值并缓存
+  BluetoothCharacteristic? findWriteCharacteristic(
+    List<BluetoothService> services,
+  ) {
+    for (final s in services) {
+      for (final c in s.characteristics) {
+        if (c.properties.write) {
+          _writeChar = c;
+          debugPrint(
+            '[蓝牙服务] 找到 Write 特征值: ${c.uuid} (service: ${s.uuid})',
+          );
+          return c;
+        }
+      }
+    }
+    debugPrint('[蓝牙服务] 未找到 Write 特征值');
+    return null;
+  }
+
+  /// 向写特征值发送数据
+  Future<void> writeData(List<int> data) async {
+    final char = _writeChar;
+    if (char == null) {
+      debugPrint('[蓝牙服务] writeData 失败: 未找到写特征值');
+      throw Exception('未找到写特征值');
+    }
+    debugPrint(
+      '[蓝牙服务] 写入数据: ${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+    );
+    await char.write(data, withoutResponse: false);
+  }
+
   /// 开启 Notify
   Future<void> enableNotify() async {
     final char = _notifyChar;
@@ -165,6 +198,7 @@ class BleService {
   /// 清除缓存的特征值引用
   void clearCharacteristicCache() {
     _notifyChar = null;
+    _writeChar = null;
   }
 
   // --- Helpers ---

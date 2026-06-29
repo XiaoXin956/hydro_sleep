@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/factory_reset/factory_reset_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
@@ -44,7 +45,7 @@ class ProfilePage extends StatelessWidget {
                   const SizedBox(height: 16),
                   const DeviceListCard(),
                   const SizedBox(height: 16),
-                  _buildSettingsWidget(theme, l10n),
+                _buildSettingsWidget(context, theme, l10n),
                   const SizedBox(height: 16),
                   const _FactoryResetRow(),
                   const SizedBox(height: 16),
@@ -68,7 +69,8 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsWidget(ThemeData theme, AppLocalizations l10n) {
+  Widget _buildSettingsWidget(
+      BuildContext context, ThemeData theme, AppLocalizations l10n) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -102,6 +104,26 @@ class ProfilePage extends StatelessWidget {
               theme: theme,
               label: l10n.bedExitShutdown,
               child: const BedExitShutdownSelector(),
+            ),
+            _divider(theme),
+            _SettingsRow(
+              theme: theme,
+              label: l10n.firmwareVersion,
+              child: BlocBuilder<BleDataCubit, BleDataState>(
+                buildWhen: (prev, curr) =>
+                    prev.firmwareVersion != curr.firmwareVersion,
+                builder: (context, dataState) {
+                  final version = dataState.firmwareVersion;
+                  return Text(
+                    version ?? '--',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: version == null
+                          ? AppColors.textHint
+                          : theme.textTheme.bodyMedium?.color,
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),
@@ -155,7 +177,38 @@ class _FactoryResetRow extends StatelessWidget {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
 
-    return BlocBuilder<FactoryResetCubit, FactoryResetState>(
+    return BlocConsumer<FactoryResetCubit, FactoryResetState>(
+      listenWhen: (prev, curr) => curr.isSuccess || curr.isFailed,
+      listener: (context, state) {
+        if (state.isSuccess) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.factoryResetSuccess),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Future.delayed(const Duration(seconds: 3), () {
+            if (context.mounted) {
+              context.read<FactoryResetCubit>().resetToInitial();
+            }
+          });
+        } else if (state.isFailed) {
+          final msg = state.error == 'notConnected'
+              ? l10n.deviceNotConnected
+              : l10n.factoryResetFailed;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              backgroundColor: Colors.red,
+            ),
+          );
+          Future.delayed(const Duration(seconds: 3), () {
+            if (context.mounted) {
+              context.read<FactoryResetCubit>().resetToInitial();
+            }
+          });
+        }
+      },
       builder: (context, state) {
         return Card(
           child: Padding(

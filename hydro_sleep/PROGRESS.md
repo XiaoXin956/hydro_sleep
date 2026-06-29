@@ -45,6 +45,40 @@
   - 首页 ConnectionStatusCard 同步显示 BLE 连接状态
   - 修复 autoConnect 时 mtu 不兼容断言错误（mtu: autoConnect ? null : 247）
 
+### 2026-06-18
+- [x] BLE 数据通信层（BleDataCubit + BleService 扩展）
+  - BleService 新增：discoverServices / findNotifyCharacteristic / findWriteCharacteristic / enableNotify / disableNotify / writeData
+  - BleDataCubit：服务发现 → 通知订阅 → 数据流 → 按 `bytes[1]` 数据类型分发
+  - DeviceInfo 模型：A5 5A 帧头解析（11字节设备信息）
+  - 首页温度、模式同步 BleDataCubit 真实数据
+- [x] BLE 重连 GATT 缓存修复
+  - 原因：`autoConnect: true` 不调用 `gatt.close()`，Android 保留旧服务缓存
+  - 修复：`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除 GATT
+- [x] Completer 重复完成异常修复
+  - `_cancelReconnect` 三处 `.complete()` 调用均加 `isCompleted` 保护
+- [x] 蓝牙关闭即时清理 UI
+  - `BleDataCubit` 监听 `adapterState`，蓝牙 off 时立即取消订阅、清理缓冲区、重置状态
+
+### 2026-06-28
+- [x] 恢复出厂设置 BLE 协议（0x17 / 0x97）
+  - `FactoryResetCubit` 注入 `BleDataCubit`，发送 `[0x17]` 命令，等待 `0x97` 响应
+  - profile_page 成功/失败 SnackBar 反馈，3s 自动重置状态
+  - l10n 新增：factoryResetSuccess / factoryResetFailed / deviceNotConnected
+- [x] 重传协议（0x01 / 0x81）
+  - 发送 15 字节命令 `7D 01 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`
+  - 0x81 响应：缓冲多包数据（跳过帧头+类型 2 字节），500ms 无新包或满 30 组后解析
+  - RetransmitRecord 模型（12字节/组：序列号、Unix时间戳、状态、心率、呼吸率、SDATA、PDATA）
+  - RetransmitTestCard：报告页手动触发测试卡片
+- [x] 固件版本查询（0x0C / 0x8C）
+  - 连接成功后自动发送 `7D 0C 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`
+  - 0x8C 响应：`bytes[2..]` 为字符串，如 `UiSleep_Pro_BLE_HVER810_FVER180`
+  - BleDataState 新增 `firmwareVersion` 字段，profile_page 实时显示
+- [x] 数据类型分发修正
+  - 响应帧结构：`bytes[0]` = 帧头，`bytes[1]` = 数据类型（0x81/0x82/0x8C/0x97）
+  - 所有分发逻辑从 `bytes[0]` 改为 `bytes[1]`（A5 5A 设备信息除外）
+- [x] 我的页面固件版本显示
+  - 通用设置新增"固件版本"行，BlocBuilder 实时同步 BleDataCubit.firmwareVersion
+
 ## 待完成
 
 ### BLoC 模块完善
@@ -52,10 +86,11 @@
 - [ ] SleepDataBloc（睡眠数据加载与缓存）
 
 ### BLE 数据通信
-- [ ] BleFrameParser — BLE 帧解析（粘包/拆包处理，帧头 0xA5 0x5A，校验和验证）
-- [ ] BleDataCubit — BLE 数据状态管理（服务发现 → 通知订阅 → 帧解析 → 数据分发）
-- [ ] BleCmd — BLE 命令类型常量（0x81~0x94）
-- [ ] 扩展 BleService 添加数据通信方法（discoverServices/enableNotify/writeData）
+- [x] BleDataCubit — BLE 数据状态管理（服务发现 → 通知订阅 → 按 bytes[1] 数据类型分发）
+- [x] BleService 扩展 — discoverServices / enableNotify / writeData
+- [x] DeviceInfo 模型 — A5 5A 帧头解析
+- [ ] BleFrameParser — 完整帧解析（校验和验证、粘包/拆包处理）
+- [ ] BleCmd — BLE 命令类型常量（完整 0x81~0x94 映射）
 
 ### 功能开发
 - [ ] 实时数据采集与展示（首页数据卡片填充）

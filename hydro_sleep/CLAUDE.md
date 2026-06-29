@@ -19,7 +19,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 lib/
   app/app.dart              - App root widget (Provider + BlocProvider + MaterialApp.router)
-  main.dart                 - Entry point (MultiProvider: ThemeProvider, LocaleCubit, FactoryResetCubit, TempUnitCubit, BedExitCubit, DeviceListCubit, BleConnectCubit)
+  main.dart                 - Entry point (MultiProvider: ThemeProvider, LocaleCubit, FactoryResetCubit, TempUnitCubit, BedExitCubit, DeviceListCubit, BleConnectCubit, BleDataCubit)
   routing/app_router.dart   - GoRouter config (Startup -> HomePage tabs -> Search)
   core/
     constants/app_constants.dart  - App-wide constants
@@ -31,9 +31,10 @@ lib/
       theme_provider.dart   - ChangeNotifier for theme toggle
     utils/mock_data.dart    - Test/mock data for UI pages
     bluetooth/
-      bluetooth_service.dart   - BleService: scan/connect/disconnect/connectionState (wraps flutter_blue_plus)
+      bluetooth_service.dart   - BleService: scan/connect/disconnect/connectionState/discoverServices/enableNotify/writeData
       ble_scan_cubit.dart      - BleScanCubit: BLE scan state (scanning/scanResults/error), filtered by platform
       ble_connect_cubit.dart   - BleConnectCubit: BLE connection lifecycle (connect/disconnect/auto-reconnect/断开检测)
+      ble_data_cubit.dart      - BleDataCubit: BLE 数据流管理，按 bytes[1] 分发（0x81/0x82/0x8C/0x97），支持命令发送与响应等待
   data/
     local/                  - Isar DB + models (build_runner generates .g.dart)
       isar_database.dart    - HydroSleepDatabase singleton
@@ -43,6 +44,8 @@ lib/
   domain/
     enums/sleep_stage.dart  - SleepStage, ReportSleepStage enums
     models/history_device.dart - HistoryDevice (Equatable, JSON serialization)
+    models/device_info.dart    - DeviceInfo (A5 5A 帧头解析，温度/模式/状态)
+    models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
   l10n/
     app_en.arb              - English translations (template)
     app_zh.arb              - Chinese translations
@@ -53,7 +56,7 @@ lib/
     index/index_page.dart             - Home tab content
     index/widgets/                    - ConnectionStatusCard, ModeSelectionCard, TemperatureControlCard, ScheduleCard
     report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly/Yearly)
-    report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart
+    report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart, RetransmitTestCard
     report/daily/
       daily_report_content.dart
       bloc/daily_report_cubit.dart
@@ -66,7 +69,7 @@ lib/
     report/yearly/
       yearly_report_content.dart
       bloc/yearly_report_cubit.dart
-    profile/profile_page.dart         - Settings (profile, device list, language, temp unit, mode preference, bed exit)
+    profile/profile_page.dart         - Settings (profile, device list, language, temp unit, mode preference, bed exit, firmware version, factory reset)
     profile/widgets/                  - ProfileCard, DeviceListCard, LanguageSelector, TemperatureUnitSelector, etc.
     device_search/device_search_page.dart - BLE device search & connect dialog (BleScanCubit + BleConnectCubit)
 ```
@@ -105,6 +108,7 @@ flutter run
   - `DeviceListCubit` — `DeviceListState` with `List<HistoryDevice>` + expand/collapse, loads from `DeviceRepository`
   - `BleScanCubit` — BLE 扫描状态（scanning/scanResults/error），Android 平台动态权限处理
   - `BleConnectCubit` — BLE 连接生命周期（connecting/connected/disconnecting/disconnected/reconnecting/failed），断开检测（stream + 3s 定时轮询），自动重连（maxRetries=3, autoConnect: true, 20s 超时, 10s 间隔），蓝牙关闭自动清理
+  - `BleDataCubit` — BLE 数据流管理（discovering → subscribing → streaming），按 `bytes[1]` 分发响应类型，支持命令发送+响应等待（`Completer` 模式），连接成功后自动查询固件版本
 - **Internationalization**: ARB-based (`flutter gen-l10n`). English is default. Language persisted via `SecureStorageService.saveLanguage()`. `LocaleCubit` loads saved locale on startup. Use `AppLocalizations.of(context)!` to access translations.
 - **Data layer**: Two singletons - `HydroSleepDatabase` (Isar) and `SecureStorageService` (flutter_secure_storage). Repositories wrap these.
 - **Routing**: GoRouter with `StatefulShellRoute.indexedStack` for 3-tab home (Home/Report/Profile). Startup -> /home auto-navigates after 2s.
@@ -112,4 +116,10 @@ flutter run
 - **Flutter 3.44 API changes**: `CardTheme` -> `CardThemeData`, `SliverChildList.fixed` -> `SliverChildBuilderDelegate`, `StatefulNavigationShell` (not `StatefulShellNavigationShell`).
 - **Isar**: Models use `@collection` annotation (lowercase, from `isar_community`). Run `build_runner` after any model change. Models live in `lib/data/local/models/`.
 - **IMPORTANT**: After modifying **any file** under `lib/data/local/`, always run `flutter pub run build_runner build --delete-conflicting-outputs` to regenerate `.g.dart` files.
-- **BLE architecture**: `BleService` (singleton-like, created inside `BleConnectCubit`) wraps `flutter_blue_plus` static API. `BleScanCubit` manages scan lifecycle. `BleConnectCubit` manages connection lifecycle with auto-reconnect. All BLE cubits use debugPrint with `[蓝牙扫描]`/`[连接管理]`/`[蓝牙服务]` prefixes for debugging.
+- **BLE architecture**: `BleService` wraps `flutter_blue_plus` static API. `BleScanCubit` manages scan lifecycle. `BleConnectCubit` manages connection lifecycle with auto-reconnect. `BleDataCubit` manages data flow (notify subscription + write commands). All BLE cubits use debugPrint with `[蓝牙扫描]`/`[连接管理]`/`[蓝牙服务]`/`[数据管理]` prefixes for debugging.
+- **BLE protocol**: 响应帧结构 `bytes[0]`=帧头，`bytes[1]`=数据类型。已实现命令：
+  - 恢复出厂：发送 `[0x17]`，响应 `0x97`
+  - 重传：发送 `7D 01 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`（15字节），响应 `0x81`（30组×12字节记录）
+  - 固件版本：发送 `7D 0C 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`（15字节），响应 `0x8C`（字符串，如 `UiSleep_Pro_BLE_HVER810_FVER180`）
+  - 设备信息：自动推送 `A5 5A` 开头 11 字节帧，由 `DeviceInfo.fromBytes()` 解析
+- **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除

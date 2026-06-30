@@ -44,8 +44,11 @@ lib/
   domain/
     enums/sleep_stage.dart  - SleepStage, ReportSleepStage enums
     models/history_device.dart - HistoryDevice (Equatable, JSON serialization)
-    models/device_info.dart    - DeviceInfo (A5 5A 帧头解析，温度/模式/状态)
+    models/device_info.dart    - DeviceInfo（A5 5A 帧头解析，温度/模式/状态）
+    models/device_status.dart  - DeviceStatus（6字节：模式、错误码、时间戳）
+    models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
+    models/retransmit30_record.dart - Retransmit30Record（15字节/组：分钟级记录）
   l10n/
     app_en.arb              - English translations (template)
     app_zh.arb              - Chinese translations
@@ -56,7 +59,10 @@ lib/
     index/index_page.dart             - Home tab content
     index/widgets/                    - ConnectionStatusCard, ModeSelectionCard, TemperatureControlCard, ScheduleCard
     report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly/Yearly)
-    report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart, RetransmitTestCard
+    report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart,
+                                      RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
+                                      DeviceStatusTestCard, HeartbeatTestCard, PressureCalibrateTestCard,
+                                      ParameterTestCard, ClockCalibrateTestCard
     report/daily/
       daily_report_content.dart
       bloc/daily_report_cubit.dart
@@ -108,7 +114,7 @@ flutter run
   - `DeviceListCubit` — `DeviceListState` with `List<HistoryDevice>` + expand/collapse, loads from `DeviceRepository`
   - `BleScanCubit` — BLE 扫描状态（scanning/scanResults/error），Android 平台动态权限处理
   - `BleConnectCubit` — BLE 连接生命周期（connecting/connected/disconnecting/disconnected/reconnecting/failed），断开检测（stream + 3s 定时轮询），自动重连（maxRetries=3, autoConnect: true, 20s 超时, 10s 间隔），蓝牙关闭自动清理
-  - `BleDataCubit` — BLE 数据流管理（discovering → subscribing → streaming），按 `bytes[1]` 分发响应类型，支持命令发送+响应等待（`Completer` 模式），连接成功后自动查询固件版本
+  - `BleDataCubit` — BLE 数据流管理（discovering → subscribing → streaming），按 `bytes[1]` 分发响应类型，支持命令发送+响应等待（`Completer` 模式），连接成功后自动查询固件版本。实时数据存储：0x85 秒数据环形缓冲（120条）、0x86 分钟数据环形缓冲（30条）
 - **Internationalization**: ARB-based (`flutter gen-l10n`). English is default. Language persisted via `SecureStorageService.saveLanguage()`. `LocaleCubit` loads saved locale on startup. Use `AppLocalizations.of(context)!` to access translations.
 - **Data layer**: Two singletons - `HydroSleepDatabase` (Isar) and `SecureStorageService` (flutter_secure_storage). Repositories wrap these.
 - **Routing**: GoRouter with `StatefulShellRoute.indexedStack` for 3-tab home (Home/Report/Profile). Startup -> /home auto-navigates after 2s.
@@ -117,9 +123,20 @@ flutter run
 - **Isar**: Models use `@collection` annotation (lowercase, from `isar_community`). Run `build_runner` after any model change. Models live in `lib/data/local/models/`.
 - **IMPORTANT**: After modifying **any file** under `lib/data/local/`, always run `flutter pub run build_runner build --delete-conflicting-outputs` to regenerate `.g.dart` files.
 - **BLE architecture**: `BleService` wraps `flutter_blue_plus` static API. `BleScanCubit` manages scan lifecycle. `BleConnectCubit` manages connection lifecycle with auto-reconnect. `BleDataCubit` manages data flow (notify subscription + write commands). All BLE cubits use debugPrint with `[蓝牙扫描]`/`[连接管理]`/`[蓝牙服务]`/`[数据管理]` prefixes for debugging.
-- **BLE protocol**: 响应帧结构 `bytes[0]`=帧头，`bytes[1]`=数据类型。已实现命令：
-  - 恢复出厂：发送 `[0x17]`，响应 `0x97`
-  - 重传：发送 `7D 01 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`（15字节），响应 `0x81`（30组×12字节记录）
-  - 固件版本：发送 `7D 0C 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`（15字节），响应 `0x8C`（字符串，如 `UiSleep_Pro_BLE_HVER810_FVER180`）
-  - 设备信息：自动推送 `A5 5A` 开头 11 字节帧，由 `DeviceInfo.fromBytes()` 解析
+- **BLE protocol**: 通用命令帧格式 `7D [类型] [长度] 00 55 4E 43 4F 4E 46 49 47 45 44 [负载] 0D`，响应帧 `bytes[0]`=帧头，`bytes[1]`=数据类型。已实现命令：
+  - 重传120秒（0x01）→ 0x81：30组×12字节记录
+  - 重传30分钟（0x02）→ 0x82：30组×15字节记录
+  - 停止指令（0x03）→ 0x83：无内容
+  - 工作模式设定（0x04）→ 0x84：确认字节（0x00/0x01/0x02/0x03/0x04）
+  - 实时秒数据（0x05）→ 0x85：每秒12字节，同 RetransmitRecord 格式
+  - 实时分钟数据（0x06）→ 0x86：每分钟15字节，同 Retransmit30Record 格式
+  - 设备状态查询（0x07）→ 0x87：6字节（模式1+错误1+时间4）
+  - 心跳应答（0x08）→ 0x88：无内容
+  - 压力校准（0x09）→ 0x89：结果字节（0x00=成功）
+  - 参数管理（0x0A）→ 0x8A：子命令01复位/02读取64字节/03设置64字节
+  - 校准时钟（0x0B）→ 0x8B：无内容，发送4字节Unix时间戳LE
+  - 固件版本（0x0C）→ 0x8C：版本字符串（如 `UiSleep_Pro_BLE_HVER810_FVER180`）
+  - 恢复出厂（0x17）→ 0x97：无内容
+  - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析
+  - 详细协议文档见 `BLE_PROTOCOL.md`
 - **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除

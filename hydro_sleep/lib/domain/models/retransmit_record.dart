@@ -23,10 +23,11 @@ class RetransmitRecord {
   bool get isValid => timestamp != null;
 
   factory RetransmitRecord.fromBytes(List<int> bytes, int offset) {
-    final timeRaw = (bytes[offset + 1] << 24) |
-        (bytes[offset + 2] << 16) |
-        (bytes[offset + 3] << 8) |
-        bytes[offset + 4];
+    // 时间戳：小端序（低位在前高位在后）
+    final timeRaw = bytes[offset + 1] |
+        (bytes[offset + 2] << 8) |
+        (bytes[offset + 3] << 16) |
+        (bytes[offset + 4] << 24);
 
     return RetransmitRecord(
       sequenceNo: bytes[offset],

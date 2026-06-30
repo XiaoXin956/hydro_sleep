@@ -64,18 +64,46 @@
   - `FactoryResetCubit` 注入 `BleDataCubit`，发送 `[0x17]` 命令，等待 `0x97` 响应
   - profile_page 成功/失败 SnackBar 反馈，3s 自动重置状态
   - l10n 新增：factoryResetSuccess / factoryResetFailed / deviceNotConnected
-- [x] 重传协议（0x01 / 0x81）
+- [x] 重传协议 — 120秒（0x01 / 0x81）
   - 发送 15 字节命令 `7D 01 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`
   - 0x81 响应：缓冲多包数据（跳过帧头+类型 2 字节），500ms 无新包或满 30 组后解析
-  - RetransmitRecord 模型（12字节/组：序列号、Unix时间戳、状态、心率、呼吸率、SDATA、PDATA）
+  - RetransmitRecord 模型（12字节/组：序列号、Unix时间戳LE、状态、心率、呼吸率、SDATA、PDATA）
   - RetransmitTestCard：报告页手动触发测试卡片
+- [x] 重传协议 — 30分钟（0x02 / 0x82）
+  - 0x82 响应：30组×15字节记录，同样多包缓冲策略
+  - Retransmit30Record 模型（15字节/组：序列号、时间戳LE、状态、心率、呼吸率、体动、打鼾次数、呼吸障碍、PTHD、温度）
+  - Retransmit30TestCard 测试卡片
+- [x] 停止指令（0x03 / 0x83）
+  - 无内容响应，设备进入待机模式。StopCommandTestCard（橙色强制停止按钮）
+- [x] 工作模式设定（0x04 / 0x84）+ 实时数据流（0x85 / 0x86）
+  - 发送 16 字节命令（14字节前缀 + 模式字节 + 0x0D），支持 0x20（监控模式）和 0x30（调试模式）
+  - 0x84 响应：确认字节 0x00~0x04（成功/不支持/未就绪/长度错误/参数错误）
+  - 0x85 实时秒数据（每秒12字节，环形缓冲120条），0x86 实时分钟数据（每分钟15字节，环形缓冲30条）
+  - BleDataState 新增 latestSecondRecord/secondRecords/latestMinuteRecord/minuteRecords 字段
+  - ModeCommandTestCard 测试卡片
+- [x] 设备状态查询（0x07 / 0x87）
+  - 0x87 响应：6字节（模式1+错误码1+时间戳4LE），DeviceStatus 模型
+  - DeviceStatusTestCard 测试卡片（模式标签+错误+校准时间）
+- [x] 心跳应答（0x08 / 0x88）
+  - 无内容响应，建议每分钟发送，超5分钟未收到设备重启WiFi
+  - HeartbeatTestCard 测试卡片（手动+自动1分钟定时，计数器）
+- [x] 压力校准指令（0x09 / 0x89）
+  - 0x89 响应：结果字节（0x00=校准完成），约4秒返回
+  - PressureCalibrateTestCard 测试卡片
+- [x] 参数管理指令（0x0A / 0x8A）
+  - 3个子命令：01复位/02读取/03设置，帧长16字节
+  - 0x8A 读取响应：64字节（16个float LE），DeviceParameters 模型
+  - 16个参数：离入床动态阈值、体动阈值、打鼾灵敏度等
+  - ParameterTestCard 测试卡片（读取/复位，显示16参数及默认值对比）
+- [x] 校准时钟指令（0x0B / 0x8B）
+  - 发送16字节命令（14字节前缀 + 4字节Unix时间戳LE + 0x0D）
+  - 0x8B 响应：无内容。ClockCalibrateTestCard 测试卡片
 - [x] 固件版本查询（0x0C / 0x8C）
   - 连接成功后自动发送 `7D 0C 0F 00 55 4E 43 4F 4E 46 49 47 45 44 0D`
   - 0x8C 响应：`bytes[2..]` 为字符串，如 `UiSleep_Pro_BLE_HVER810_FVER180`
   - BleDataState 新增 `firmwareVersion` 字段，profile_page 实时显示
 - [x] 数据类型分发修正
-  - 响应帧结构：`bytes[0]` = 帧头，`bytes[1]` = 数据类型（0x81/0x82/0x8C/0x97）
-  - 所有分发逻辑从 `bytes[0]` 改为 `bytes[1]`（A5 5A 设备信息除外）
+  - 响应帧结构：`bytes[0]` = 帧头，`bytes[1]` = 数据类型（A5 5A 设备信息除外）
 - [x] 我的页面固件版本显示
   - 通用设置新增"固件版本"行，BlocBuilder 实时同步 BleDataCubit.firmwareVersion
 
@@ -89,8 +117,8 @@
 - [x] BleDataCubit — BLE 数据状态管理（服务发现 → 通知订阅 → 按 bytes[1] 数据类型分发）
 - [x] BleService 扩展 — discoverServices / enableNotify / writeData
 - [x] DeviceInfo 模型 — A5 5A 帧头解析
+- [x] BLE 协议命令实现 — 13个命令/响应对（0x01~0x0C, 0x17）+ 实时数据流（0x85/0x86）
 - [ ] BleFrameParser — 完整帧解析（校验和验证、粘包/拆包处理）
-- [ ] BleCmd — BLE 命令类型常量（完整 0x81~0x94 映射）
 
 ### 功能开发
 - [ ] 实时数据采集与展示（首页数据卡片填充）

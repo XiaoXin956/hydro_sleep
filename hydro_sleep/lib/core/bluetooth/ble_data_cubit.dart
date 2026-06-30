@@ -7,7 +7,10 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/bluetooth/bluetooth_service.dart';
 import 'package:hydro_sleep/domain/models/device_info.dart';
+import 'package:hydro_sleep/domain/models/device_status.dart';
+import 'package:hydro_sleep/domain/models/device_parameters.dart';
 import 'package:hydro_sleep/domain/models/retransmit_record.dart';
+import 'package:hydro_sleep/domain/models/retransmit30_record.dart';
 
 // --- Status ---
 
@@ -29,6 +32,15 @@ class BleDataState extends Equatable {
   final List<int>? lastReceived;
   final List<String> rawLog;
 
+  /// 最新一条实时秒数据（0x85）
+  final RetransmitRecord? latestSecondRecord;
+  /// 实时秒数据缓冲区（最多 120 条）
+  final List<RetransmitRecord> secondRecords;
+  /// 最新一条实时分钟数据（0x86）
+  final Retransmit30Record? latestMinuteRecord;
+  /// 实时分钟数据缓冲区（最多 30 条）
+  final List<Retransmit30Record> minuteRecords;
+
   const BleDataState({
     this.status = BleDataStatus.idle,
     this.error,
@@ -36,6 +48,10 @@ class BleDataState extends Equatable {
     this.firmwareVersion,
     this.lastReceived,
     this.rawLog = const [],
+    this.latestSecondRecord,
+    this.secondRecords = const [],
+    this.latestMinuteRecord,
+    this.minuteRecords = const [],
   });
 
   BleDataState copyWith({
@@ -45,6 +61,10 @@ class BleDataState extends Equatable {
     String? firmwareVersion,
     List<int>? lastReceived,
     List<String>? rawLog,
+    RetransmitRecord? latestSecondRecord,
+    List<RetransmitRecord>? secondRecords,
+    Retransmit30Record? latestMinuteRecord,
+    List<Retransmit30Record>? minuteRecords,
   }) {
     return BleDataState(
       status: status ?? this.status,
@@ -53,6 +73,10 @@ class BleDataState extends Equatable {
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       lastReceived: lastReceived ?? this.lastReceived,
       rawLog: rawLog ?? this.rawLog,
+      latestSecondRecord: latestSecondRecord ?? this.latestSecondRecord,
+      secondRecords: secondRecords ?? this.secondRecords,
+      latestMinuteRecord: latestMinuteRecord ?? this.latestMinuteRecord,
+      minuteRecords: minuteRecords ?? this.minuteRecords,
     );
   }
 
@@ -64,6 +88,10 @@ class BleDataState extends Equatable {
         firmwareVersion,
         lastReceived,
         rawLog,
+        latestSecondRecord,
+        secondRecords,
+        latestMinuteRecord,
+        minuteRecords,
       ];
 }
 
@@ -85,26 +113,95 @@ class BleDataCubit extends Cubit<BleDataState> {
   StreamSubscription<List<int>>? _dataSub;
   Completer<bool>? _responseCompleter;
 
-  // 重传相关
+  // 重传相关（120秒）
   bool _awaitingRetransmit = false;
   Completer<List<RetransmitRecord>>? _retransmitCompleter;
   List<int> _retransmitBuffer = [];
   Timer? _retransmitTimer;
 
+  // 重传相关（30分钟）
+  bool _awaitingRetransmit30 = false;
+  Completer<List<Retransmit30Record>>? _retransmit30Completer;
+  List<int> _retransmit30Buffer = [];
+  Timer? _retransmit30Timer;
+
   // 固件版本相关
   Completer<String?>? _firmwareVersionCompleter;
+
+  // 模式设定相关
+  Completer<int>? _modeCommandCompleter;
+
+  // 设备状态查询相关
+  Completer<DeviceStatus?>? _deviceStatusCompleter;
+
+  // 参数查询相关（0x0A/0x8A）
+  Completer<DeviceParameters?>? _parametersCompleter;
 
   static const _deviceInfoLength = 11;
   static const _headerDeviceByte1 = 0xA5;
   static const _headerDeviceByte2 = 0x5A;
   static const _headerCmd0x81 = 0x81;
   static const _headerCmd0x82 = 0x82;
+  static const _headerCmd0x83 = 0x83;
+  static const _headerCmd0x84 = 0x84;
+  static const _headerCmd0x85 = 0x85;
+  static const _headerCmd0x86 = 0x86;
+  static const _headerCmd0x87 = 0x87;
+  static const _headerCmd0x88 = 0x88;
+  static const _headerCmd0x89 = 0x89;
+  static const _headerCmd0x8A = 0x8A;
+  static const _headerCmd0x8B = 0x8B;
   static const _headerCmd0x8C = 0x8C;
   static const _headerResponse = 0x97;
 
   static const _firmwareVersionCommand = [
     0x7D, 0x0C, 0x0F, 0x00,
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
+  ];
+
+  /// 停止指令 0x03，强制停止工作，设备进入待机模式
+  static const stopCommand = [
+    0x7D, 0x03, 0x0F, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
+  ];
+
+  /// 工作模式设定 0x04，[模式字节] 决定设备行为
+  /// 0x20 = 上位机监控模式，0x30 = 数据调试模式
+  static const _modeCommandPrefix = [
+    0x7D, 0x04, 0x10, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+  ];
+  static const modeMonitor = 0x20;
+  static const modeDebug = 0x30;
+
+  /// 查询设备状态 0x07，等待 0x87 响应（模式+错误+时间）
+  static const _deviceStatusCommand = [
+    0x7D, 0x07, 0x0F, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
+  ];
+
+  /// 心跳应答 0x08，每分钟发送一次，超 5 分钟未收到设备将重启 WiFi
+  static const heartbeatCommand = [
+    0x7D, 0x08, 0x0F, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
+  ];
+
+  /// 压力校准指令 0x09，设备强制停止工作并开始校准，约 4 秒返回
+  static const pressureCalibrateCommand = [
+    0x7D, 0x09, 0x0F, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
+  ];
+
+  /// 参数指令 0x0A 前缀（16 字节：7D 0A 10 00 ... 44 [子命令] 0D）
+  static const _paramCommandPrefix = [
+    0x7D, 0x0A, 0x10, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+  ];
+
+  /// 校准时钟指令 0x0B 前缀（14 字节：7D 0B 10 00 ... 44 [4字节时间LE] 0D）
+  static const _clockCalibratePrefix = [
+    0x7D, 0x0B, 0x10, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
   ];
 
   void _onConnectStateChanged(BleConnectState connectState) {
@@ -134,11 +231,31 @@ class BleDataCubit extends Cubit<BleDataState> {
         _retransmitCompleter!.complete([]);
       }
       _retransmitCompleter = null;
+      _awaitingRetransmit30 = false;
+      _retransmit30Buffer = [];
+      _retransmit30Timer?.cancel();
+      _retransmit30Timer = null;
+      if (_retransmit30Completer != null && !_retransmit30Completer!.isCompleted) {
+        _retransmit30Completer!.complete([]);
+      }
+      _retransmit30Completer = null;
       if (_firmwareVersionCompleter != null &&
           !_firmwareVersionCompleter!.isCompleted) {
         _firmwareVersionCompleter!.complete(null);
       }
       _firmwareVersionCompleter = null;
+      if (_modeCommandCompleter != null && !_modeCommandCompleter!.isCompleted) {
+        _modeCommandCompleter!.complete(-1);
+      }
+      _modeCommandCompleter = null;
+      if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
+        _deviceStatusCompleter!.complete(null);
+      }
+      _deviceStatusCompleter = null;
+      if (_parametersCompleter != null && !_parametersCompleter!.isCompleted) {
+        _parametersCompleter!.complete(null);
+      }
+      _parametersCompleter = null;
       _bleService.clearCharacteristicCache();
       if (state.status != BleDataStatus.idle) {
         debugPrint('[数据管理] 蓝牙已关闭，清理所有数据');
@@ -232,12 +349,134 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
-  /// 发送重传指令 0x01，等待设备回复 0x81 历史数据
+  /// 发送工作模式设定命令 0x04，等待 0x84 确认响应
+  /// 返回响应内容字节（0x20/0x21/0x22/0x30/0x31），null 表示超时
+  Future<int?> sendModeCommand(
+    int mode, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) {
+      debugPrint('[数据管理] sendModeCommand 失败: 未处于 streaming 状态');
+      return null;
+    }
+
+    _modeCommandCompleter = Completer<int>();
+    try {
+      final cmd = [..._modeCommandPrefix, mode, 0x0D];
+      await _bleService.writeData(cmd);
+      debugPrint('[数据管理] 模式设定命令已发送 mode=0x${mode.toRadixString(16)}，等待 0x84 响应...');
+      return await _modeCommandCompleter!.future.timeout(timeout, onTimeout: () {
+        debugPrint('[数据管理] 模式设定响应超时');
+        return -1;
+      });
+    } catch (e) {
+      debugPrint('[数据管理] sendModeCommand 异常: $e');
+      return null;
+    } finally {
+      _modeCommandCompleter = null;
+    }
+  }
+
+  /// 查询设备状态 0x07，等待 0x87 响应
+  /// 返回 DeviceStatus（模式+错误+设备时间），null 表示超时或异常
+  Future<DeviceStatus?> sendDeviceStatusCommand({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) {
+      debugPrint('[数据管理] sendDeviceStatusCommand 失败: 未处于 streaming 状态');
+      return null;
+    }
+
+    _deviceStatusCompleter = Completer<DeviceStatus?>();
+    try {
+      await _bleService.writeData(_deviceStatusCommand);
+      debugPrint('[数据管理] 设备状态查询已发送，等待 0x87 响应...');
+      return await _deviceStatusCompleter!.future.timeout(timeout, onTimeout: () {
+        debugPrint('[数据管理] 设备状态查询超时');
+        return null;
+      });
+    } catch (e) {
+      debugPrint('[数据管理] sendDeviceStatusCommand 异常: $e');
+      return null;
+    } finally {
+      _deviceStatusCompleter = null;
+    }
+  }
+
+  /// 复位参数 0x0A+0x00，等待 0x8A 确认
+  Future<bool> resetParameters({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) return false;
+    final cmd = [..._paramCommandPrefix, 0x00, 0x0D];
+    return sendCommand(cmd, timeout: timeout);
+  }
+
+  /// 读取参数 0x0A+0x01，等待 0x8A 返回 16 个 float 参数
+  Future<DeviceParameters?> readParameters({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) return null;
+    _parametersCompleter = Completer<DeviceParameters?>();
+    try {
+      final cmd = [..._paramCommandPrefix, 0x01, 0x0D];
+      await _bleService.writeData(cmd);
+      debugPrint('[数据管理] 参数读取命令已发送，等待 0x8A 响应...');
+      return await _parametersCompleter!.future.timeout(timeout, onTimeout: () {
+        debugPrint('[数据管理] 参数读取超时');
+        return null;
+      });
+    } catch (e) {
+      debugPrint('[数据管理] readParameters 异常: $e');
+      return null;
+    } finally {
+      _parametersCompleter = null;
+    }
+  }
+
+  /// 设置参数 0x0A+0x02+[64字节]，等待 0x8A 确认
+  Future<bool> setParameters(
+    DeviceParameters params, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) return false;
+    final cmd = [..._paramCommandPrefix, 0x02, ...params.toBytes(), 0x0D];
+    return sendCommand(cmd, timeout: timeout);
+  }
+
+  /// 校准时钟 0x0B，发送当前时间，设备更新时钟并返回 0x8B
+  /// 可选传入指定时间，默认使用当前系统时间
+  Future<bool> sendCalibrateClockCommand({
+    DateTime? time,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) return false;
+    final t = time ?? DateTime.now();
+    final epoch = t.millisecondsSinceEpoch ~/ 1000;
+    final timeBytes = [
+      epoch & 0xFF,
+      (epoch >> 8) & 0xFF,
+      (epoch >> 16) & 0xFF,
+      (epoch >> 24) & 0xFF,
+    ];
+    final cmd = [..._clockCalibratePrefix, ...timeBytes, 0x0D];
+    debugPrint('[数据管理] 校准时钟: epoch=$epoch');
+    return sendCommand(cmd, timeout: timeout);
+  }
+
+  /// 发送重传指令 0x01（过去 30 秒数据），等待设备回复 0x81 历史数据
   static const _retransmitCommand = [
     0x7D, 0x01, 0x0F, 0x00,
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
   ];
   static const _retransmitRecordSize = 12;
+
+  /// 发送重传指令 0x02（过去 30 分钟），等待设备回复 0x82 数据
+  static const _retransmit30Command = [
+    0x7D, 0x02, 0x0F, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
+  ];
+  static const _retransmit30RecordSize = 15;
 
   Future<List<RetransmitRecord>> sendRetransmitCommand({
     Duration timeout = const Duration(seconds: 10),
@@ -288,6 +527,58 @@ class BleDataCubit extends Cubit<BleDataState> {
       records.add(RetransmitRecord.fromBytes(data, i));
     }
     debugPrint('[数据管理] 解析重传记录 ${records.length} 条');
+    return records;
+  }
+
+  /// 发送重传指令 0x02（30分钟），等待设备回复 0x82 历史数据
+  Future<List<Retransmit30Record>> sendRetransmit30Command({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) {
+      debugPrint('[数据管理] sendRetransmit30Command 失败: 未处于 streaming 状态');
+      return [];
+    }
+
+    _awaitingRetransmit30 = true;
+    _retransmit30Buffer = [];
+    _retransmit30Completer = Completer<List<Retransmit30Record>>();
+
+    try {
+      await _bleService.writeData(_retransmit30Command);
+      debugPrint('[数据管理] 重传指令(30分钟)已发送，等待 0x82 响应...');
+
+      final result = await _retransmit30Completer!.future.timeout(
+        timeout,
+        onTimeout: () {
+          debugPrint('[数据管理] 重传响应(30分钟)超时，尝试解析已有数据');
+          return _parseRetransmit30Buffer();
+        },
+      );
+      return result;
+    } catch (e) {
+      debugPrint('[数据管理] sendRetransmit30Command 异常: $e');
+      return [];
+    } finally {
+      _awaitingRetransmit30 = false;
+      _retransmit30Completer = null;
+      _retransmit30Timer?.cancel();
+      _retransmit30Timer = null;
+      _retransmit30Buffer = [];
+    }
+  }
+
+  List<Retransmit30Record> _parseRetransmit30Buffer() {
+    final data = _retransmit30Buffer;
+    if (data.length < _retransmit30RecordSize) {
+      debugPrint('[数据管理] 重传数据(30分钟)不足一组: ${data.length}字节');
+      return [];
+    }
+    final records = <Retransmit30Record>[];
+    for (var i = 0; i + _retransmit30RecordSize <= data.length;
+        i += _retransmit30RecordSize) {
+      records.add(Retransmit30Record.fromBytes(data, i));
+    }
+    debugPrint('[数据管理] 解析重传记录(30分钟) ${records.length} 条');
     return records;
   }
 
@@ -347,11 +638,12 @@ class BleDataCubit extends Cubit<BleDataState> {
     if (bytes.length >= _deviceInfoLength &&
         bytes[0] == _headerDeviceByte1 &&
         bytes[1] == _headerDeviceByte2) {
-      // 设备信息（11 字节）
+      // 设备信息（A5 5A 帧头，11 字节，自动推送）
       final info = DeviceInfo.fromBytes(bytes);
       debugPrint('[数据管理] 设备信息: $info');
       emit(state.copyWith(deviceInfo: info, lastReceived: bytes, rawLog: log));
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x81) {
+      // 0x81：重传响应（120秒），命令 0x01 触发，30组×12字节
       if (_awaitingRetransmit) {
         // 重传响应：跳过帧头 + 数据类型（2字节），缓冲后续数据
         _retransmitBuffer.addAll(bytes.sublist(2));
@@ -384,10 +676,39 @@ class BleDataCubit extends Cubit<BleDataState> {
       }
       emit(state.copyWith(lastReceived: bytes, rawLog: log));
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x82) {
-      debugPrint('[数据管理] 收到 0x82 数据（预留）: $bytes');
+      // 0x82：重传响应（30分钟），命令 0x02 触发，30组×15字节
+      if (_awaitingRetransmit30) {
+        // 重传响应（30分钟）：跳过帧头 + 数据类型（2字节），缓冲后续数据
+        _retransmit30Buffer.addAll(bytes.sublist(2));
+        debugPrint(
+          '[数据管理] 重传数据缓冲(30分钟): +${bytes.length - 2}字节, '
+          '累计${_retransmit30Buffer.length}字节',
+        );
+        _retransmit30Timer?.cancel();
+        if (_retransmit30Buffer.length >= 30 * _retransmit30RecordSize) {
+          _retransmit30Timer = null;
+          if (_retransmit30Completer != null &&
+              !_retransmit30Completer!.isCompleted) {
+            _retransmit30Completer!.complete(_parseRetransmit30Buffer());
+          }
+        } else {
+          _retransmit30Timer = Timer(
+            const Duration(milliseconds: 500),
+            () {
+              debugPrint('[数据管理] 重传数据(30分钟) 500ms 无新包，解析已有数据');
+              if (_retransmit30Completer != null &&
+                  !_retransmit30Completer!.isCompleted) {
+                _retransmit30Completer!.complete(_parseRetransmit30Buffer());
+              }
+            },
+          );
+        }
+      } else {
+        debugPrint('[数据管理] 收到 0x82 数据（非重传）: $bytes');
+      }
       emit(state.copyWith(lastReceived: bytes, rawLog: log));
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x8C) {
-      // 固件版本响应：bytes[2] 开始为字符串
+      // 0x8C：固件版本响应，命令 0x0C 触发，bytes[2..] 为版本字符串
       final versionBytes = bytes.sublist(2);
       final version = String.fromCharCodes(versionBytes);
       debugPrint('[数据管理] 固件版本响应: $version');
@@ -401,12 +722,141 @@ class BleDataCubit extends Cubit<BleDataState> {
         _firmwareVersionCompleter!.complete(version);
       }
     } else if (bytes.length >= 2 && bytes[1] == _headerResponse) {
+      // 0x97：恢复出厂设置完成响应，命令 0x17 触发
       debugPrint('[数据管理] 收到 0x97 响应: $bytes');
       emit(state.copyWith(lastReceived: bytes, rawLog: log));
       if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
         _responseCompleter!.complete(true);
       }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x83) {
+      // 0x83：停止指令响应，命令 0x03 触发，设备进入待机模式
+      debugPrint('[数据管理] 收到 0x83 响应: $bytes');
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+        _responseCompleter!.complete(true);
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x84) {
+      // 0x84：工作模式设定响应，命令 0x04 触发，bytes[2] 为确认内容
+      final content = bytes.length >= 3 ? bytes[2] : 0;
+      final contentHex = content.toRadixString(16).padLeft(2, '0');
+      debugPrint('[数据管理] 收到 0x84 响应: content=0x$contentHex, $bytes');
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      if (_modeCommandCompleter != null && !_modeCommandCompleter!.isCompleted) {
+        _modeCommandCompleter!.complete(content);
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x85) {
+      // 0x85：实时秒数据（每秒），监控/调试模式下自动推送，12字节同 RetransmitRecord
+      if (bytes.length >= 14) {
+        final record = RetransmitRecord.fromBytes(bytes, 2);
+        final updated = List<RetransmitRecord>.from(state.secondRecords)
+          ..add(record);
+        if (updated.length > 120) updated.removeAt(0);
+        debugPrint('[数据管理] 0x85 实时数据: seq=${record.sequenceNo}, hr=${record.heartRate}, br=${record.breathRate}');
+        emit(state.copyWith(
+          latestSecondRecord: record,
+          secondRecords: updated,
+          lastReceived: bytes,
+          rawLog: log,
+        ));
+      } else {
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x86) {
+      // 0x86：实时分钟数据（每分钟），监控/调试模式下自动推送，15字节同 Retransmit30Record
+      if (bytes.length >= 17) {
+        final record = Retransmit30Record.fromBytes(bytes, 2);
+        final updated = List<Retransmit30Record>.from(state.minuteRecords)
+          ..add(record);
+        if (updated.length > 30) updated.removeAt(0);
+        debugPrint('[数据管理] 0x86 分钟数据: seq=${record.sequenceNo}, hr=${record.heartRate}, br=${record.breathRate}');
+        emit(state.copyWith(
+          latestMinuteRecord: record,
+          minuteRecords: updated,
+          lastReceived: bytes,
+          rawLog: log,
+        ));
+      } else {
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x87) {
+      // 0x87：设备状态查询响应，命令 0x07 触发，bytes[2..7] 为6字节内容（模式+错误+时间）
+      if (bytes.length >= 8) {
+        final status = DeviceStatus.fromBytes(bytes.sublist(2, 8));
+        debugPrint('[数据管理] 设备状态: $status');
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+        if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
+          _deviceStatusCompleter!.complete(status);
+        }
+      } else {
+        debugPrint('[数据管理] 0x87 响应数据不足: ${bytes.length}字节');
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+        if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
+          _deviceStatusCompleter!.complete(null);
+        }
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x88) {
+      // 0x88：心跳应答响应，命令 0x08 触发，内容无，保持设备联网
+      debugPrint('[数据管理] 收到 0x88 心跳响应: $bytes');
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+        _responseCompleter!.complete(true);
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x89) {
+      // 0x89：压力校准响应，命令 0x09 触发，bytes[2] 为结果（0x00=完成，其他=无法校准）
+      final result = bytes.length >= 3 ? bytes[2] : -1;
+      final ok = result == 0x00;
+      debugPrint('[数据管理] 收到 0x89 校准响应: result=0x${result.toRadixString(16).padLeft(2, '0')} (${ok ? "校准完成" : "无法校准"})');
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+        _responseCompleter!.complete(ok);
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x8A) {
+      // 0x8A：参数指令响应，命令 0x0A 触发
+      // 响应帧头 16 字节后为内容：bytes[16] 为子命令
+      final contentByte = bytes.length >= 17 ? bytes[16] : -1;
+      debugPrint('[数据管理] 收到 0x8A 参数响应: content=0x${contentByte.toRadixString(16).padLeft(2, '0')}, ${bytes.length}字节');
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      if (contentByte == 0x01 && bytes.length >= 81) {
+        // 读取响应：0x01 + 64字节参数
+        final params = DeviceParameters.fromBytes(bytes.sublist(17, 81));
+        debugPrint('[数据管理] 参数读取成功: $params');
+        if (_parametersCompleter != null && !_parametersCompleter!.isCompleted) {
+          _parametersCompleter!.complete(params);
+        }
+      } else if (contentByte == 0x00 || contentByte == 0x02) {
+        // 复位(0x00)或设置(0x02)成功
+        if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+          _responseCompleter!.complete(true);
+        }
+        if (_parametersCompleter != null && !_parametersCompleter!.isCompleted) {
+          _parametersCompleter!.complete(null);
+        }
+      } else if (contentByte == 0x03) {
+        // 设置失败：数据位数不对或参数错误
+        debugPrint('[数据管理] 参数设置失败: 数据错误');
+        if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+          _responseCompleter!.complete(false);
+        }
+        if (_parametersCompleter != null && !_parametersCompleter!.isCompleted) {
+          _parametersCompleter!.complete(null);
+        }
+      } else {
+        if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+          _responseCompleter!.complete(false);
+        }
+        if (_parametersCompleter != null && !_parametersCompleter!.isCompleted) {
+          _parametersCompleter!.complete(null);
+        }
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x8B) {
+      // 0x8B：校准时钟响应，命令 0x0B 触发，内容无，设备时钟已更新
+      debugPrint('[数据管理] 收到 0x8B 校准时钟响应: $bytes');
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
+        _responseCompleter!.complete(true);
+      }
     } else {
+      // 未知数据类型：未匹配到已知帧头
       debugPrint('[数据管理] 未知数据类型 bytes[1]=0x${bytes.length >= 2 ? bytes[1].toRadixString(16) : '??'}: $bytes');
       emit(state.copyWith(lastReceived: bytes, rawLog: log));
     }
@@ -428,11 +878,31 @@ class BleDataCubit extends Cubit<BleDataState> {
       _retransmitCompleter!.complete([]);
     }
     _retransmitCompleter = null;
+    _awaitingRetransmit30 = false;
+    _retransmit30Buffer = [];
+    _retransmit30Timer?.cancel();
+    _retransmit30Timer = null;
+    if (_retransmit30Completer != null && !_retransmit30Completer!.isCompleted) {
+      _retransmit30Completer!.complete([]);
+    }
+    _retransmit30Completer = null;
     if (_firmwareVersionCompleter != null &&
         !_firmwareVersionCompleter!.isCompleted) {
       _firmwareVersionCompleter!.complete(null);
     }
     _firmwareVersionCompleter = null;
+    if (_modeCommandCompleter != null && !_modeCommandCompleter!.isCompleted) {
+      _modeCommandCompleter!.complete(-1);
+    }
+    _modeCommandCompleter = null;
+    if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
+      _deviceStatusCompleter!.complete(null);
+    }
+    _deviceStatusCompleter = null;
+    if (_parametersCompleter != null && !_parametersCompleter!.isCompleted) {
+      _parametersCompleter!.complete(null);
+    }
+    _parametersCompleter = null;
     _bleService.disableNotify();
     _bleService.clearCharacteristicCache();
     emit(const BleDataState());

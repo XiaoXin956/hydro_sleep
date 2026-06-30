@@ -5,6 +5,14 @@ import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dar
 import 'package:hydro_sleep/presentation/report/widgets/sleep_temp_curve.dart';
 import 'package:hydro_sleep/presentation/report/widgets/heart_rate_chart.dart';
 import 'package:hydro_sleep/presentation/report/widgets/retransmit_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/retransmit30_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/stop_command_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/mode_command_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/device_status_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/heartbeat_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/pressure_calibrate_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/parameter_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/clock_calibrate_test_card.dart';
 
 /// 日报告内容
 class DailyReportContent extends StatelessWidget {
@@ -30,10 +38,26 @@ class DailyReportContent extends StatelessWidget {
                 const HeartRateChart(),
                 const SizedBox(height: 16),
                 const RetransmitTestCard(),
+                const SizedBox(height: 16),
+                const Retransmit30TestCard(),
+                const SizedBox(height: 16),
+                const StopCommandTestCard(),
+                const SizedBox(height: 16),
+                const ModeCommandTestCard(),
+                const SizedBox(height: 16),
+                const DeviceStatusTestCard(),
+                const SizedBox(height: 16),
+                const HeartbeatTestCard(),
+                const SizedBox(height: 16),
+                const PressureCalibrateTestCard(),
+                const SizedBox(height: 16),
+                const ParameterTestCard(),
+                const SizedBox(height: 16),
+                const ClockCalibrateTestCard(),
                 const SizedBox(height: 40),
               ];
               return items[index];
-            }, childCount: 12),
+            }, childCount: 28),
           ),
         ),
       ],

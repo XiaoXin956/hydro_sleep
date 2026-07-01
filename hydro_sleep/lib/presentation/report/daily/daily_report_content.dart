@@ -13,6 +13,9 @@ import 'package:hydro_sleep/presentation/report/widgets/heartbeat_test_card.dart
 import 'package:hydro_sleep/presentation/report/widgets/pressure_calibrate_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/parameter_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/clock_calibrate_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/report_query_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/report_detail_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/firmware_version_test_card.dart';
 
 /// 日报告内容
 class DailyReportContent extends StatelessWidget {
@@ -54,10 +57,16 @@ class DailyReportContent extends StatelessWidget {
                 const ParameterTestCard(),
                 const SizedBox(height: 16),
                 const ClockCalibrateTestCard(),
+                const SizedBox(height: 16),
+                const ReportQueryTestCard(),
+                const SizedBox(height: 16),
+                const ReportDetailTestCard(),
+                const SizedBox(height: 16),
+                const FirmwareVersionTestCard(),
                 const SizedBox(height: 40),
               ];
               return items[index];
-            }, childCount: 28),
+            }, childCount: 34),
           ),
         ),
       ],

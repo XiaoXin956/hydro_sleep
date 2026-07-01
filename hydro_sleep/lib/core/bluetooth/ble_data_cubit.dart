@@ -11,6 +11,8 @@ import 'package:hydro_sleep/domain/models/device_status.dart';
 import 'package:hydro_sleep/domain/models/device_parameters.dart';
 import 'package:hydro_sleep/domain/models/retransmit_record.dart';
 import 'package:hydro_sleep/domain/models/retransmit30_record.dart';
+import 'package:hydro_sleep/domain/models/report_summary.dart';
+import 'package:hydro_sleep/domain/models/sleep_minute_record.dart';
 
 // --- Status ---
 
@@ -137,6 +139,15 @@ class BleDataCubit extends Cubit<BleDataState> {
   // 参数查询相关（0x0A/0x8A）
   Completer<DeviceParameters?>? _parametersCompleter;
 
+  // 报表查询相关（0x13/0x93）
+  Completer<List<ReportSummary>>? _reportQueryCompleter;
+  List<ReportSummary> _reportBuffer = [];
+  static const _reportBatchCount = 3; // 设备分 3 批发送
+  int _reportBatchReceived = 0;
+
+  // 存储数据读取相关（0x14/0x94）
+  Completer<List<SleepMinuteRecord>>? _sleepDataCompleter;
+
   static const _deviceInfoLength = 11;
   static const _headerDeviceByte1 = 0xA5;
   static const _headerDeviceByte2 = 0x5A;
@@ -152,8 +163,11 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const _headerCmd0x8A = 0x8A;
   static const _headerCmd0x8B = 0x8B;
   static const _headerCmd0x8C = 0x8C;
+  static const _headerCmd0x93 = 0x93;
+  static const _headerCmd0x94 = 0x94;
   static const _headerResponse = 0x97;
 
+  /// 指令 0x0C 设备版本及固件版本查询
   static const _firmwareVersionCommand = [
     0x7D, 0x0C, 0x0F, 0x00,
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
@@ -202,6 +216,12 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const _clockCalibratePrefix = [
     0x7D, 0x0B, 0x10, 0x00,
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+  ];
+
+  /// 设备存储报表查询 0x13，请求设备发送存储的 15 组报表概要
+  static const _reportQueryCommand = [
+    0x7D, 0x13, 0x0F, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
   ];
 
   void _onConnectStateChanged(BleConnectState connectState) {
@@ -256,6 +276,16 @@ class BleDataCubit extends Cubit<BleDataState> {
         _parametersCompleter!.complete(null);
       }
       _parametersCompleter = null;
+      _reportBuffer = [];
+      _reportBatchReceived = 0;
+      if (_reportQueryCompleter != null && !_reportQueryCompleter!.isCompleted) {
+        _reportQueryCompleter!.complete([]);
+      }
+      _reportQueryCompleter = null;
+      if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+        _sleepDataCompleter!.complete([]);
+      }
+      _sleepDataCompleter = null;
       _bleService.clearCharacteristicCache();
       if (state.status != BleDataStatus.idle) {
         debugPrint('[数据管理] 蓝牙已关闭，清理所有数据');
@@ -462,6 +492,78 @@ class BleDataCubit extends Cubit<BleDataState> {
     final cmd = [..._clockCalibratePrefix, ...timeBytes, 0x0D];
     debugPrint('[数据管理] 校准时钟: epoch=$epoch');
     return sendCommand(cmd, timeout: timeout);
+  }
+
+  /// 发送设备存储报表查询 0x13，等待设备回复 3 批 0x93 数据（共 15 组报表概要）
+  Future<List<ReportSummary>> sendReportQueryCommand({
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) {
+      debugPrint('[数据管理] sendReportQueryCommand 失败: 未处于 streaming 状态');
+      return [];
+    }
+
+    _reportQueryCompleter = Completer<List<ReportSummary>>();
+    _reportBuffer = [];
+    _reportBatchReceived = 0;
+    try {
+      await _bleService.writeData(_reportQueryCommand);
+      debugPrint('[数据管理] 报表查询已发送，等待 0x93 响应...');
+      return await _reportQueryCompleter!.future.timeout(
+        timeout,
+        onTimeout: () {
+          debugPrint('[数据管理] 报表查询超时，已收到 $_reportBatchReceived 批');
+          return List.unmodifiable(_reportBuffer);
+        },
+      );
+    } catch (e) {
+      debugPrint('[数据管理] sendReportQueryCommand 异常: $e');
+      return [];
+    } finally {
+      _reportQueryCompleter = null;
+      _reportBuffer = [];
+      _reportBatchReceived = 0;
+    }
+  }
+
+  /// 发送设备存储数据读取 0x14，读取某个报表的某个 30 分钟段
+  /// [startTime] 从 0x13 报表查询获得的 4 字节开始时间（LE）
+  /// [seq] 序号 0~47，每序号 30 分钟，共 48×30=1440 分钟
+  Future<List<SleepMinuteRecord>> sendSleepDataReadCommand({
+    required int startTime,
+    required int seq,
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
+    if (state.status != BleDataStatus.streaming) {
+      debugPrint('[数据管理] sendSleepDataReadCommand 失败: 未处于 streaming 状态');
+      return [];
+    }
+
+    _sleepDataCompleter = Completer<List<SleepMinuteRecord>>();
+    final cmd = [
+      0x7D, 0x14, 0x14, 0x00,
+      0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+      startTime & 0xFF, (startTime >> 8) & 0xFF,
+      (startTime >> 16) & 0xFF, (startTime >> 24) & 0xFF,
+      seq,
+      0x0D,
+    ];
+    debugPrint('[数据管理] 读取存储数据: startTime=0x${startTime.toRadixString(16)}, seq=$seq');
+    try {
+      await _bleService.writeData(cmd);
+      return await _sleepDataCompleter!.future.timeout(
+        timeout,
+        onTimeout: () {
+          debugPrint('[数据管理] 存储数据读取超时');
+          return [];
+        },
+      );
+    } catch (e) {
+      debugPrint('[数据管理] sendSleepDataReadCommand 异常: $e');
+      return [];
+    } finally {
+      _sleepDataCompleter = null;
+    }
   }
 
   /// 发送重传指令 0x01（过去 30 秒数据），等待设备回复 0x81 历史数据
@@ -855,6 +957,67 @@ class BleDataCubit extends Cubit<BleDataState> {
       if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
         _responseCompleter!.complete(true);
       }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x93) {
+      // 0x93：设备存储报表查询响应，命令 0x13 触发
+      // 帧结构：7D 93 [长度2B LE] [UNCONFIGED 10B] [序号1B] [5组×26B] 0D
+      // 设备分 3 批发送（间隔 300ms），序号 = 0/1/2
+      if (bytes.length >= 28) {
+        // 内容从 bytes[14] 开始（跳过帧头+类型+长度+UNCONFIGED）
+        final seq = bytes[14];
+        debugPrint('[数据管理] 0x93 报表批次 $seq/2，${bytes.length}字节');
+        // 解析本批 5 组 × 26 字节（bytes[15] 开始）
+        for (var i = 0; i < 5; i++) {
+          final offset = 15 + i * 26;
+          if (offset + 26 <= bytes.length - 1) { // 留出尾帧 0D
+            _reportBuffer.add(ReportSummary.fromBytes(bytes, offset));
+          }
+        }
+        _reportBatchReceived++;
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+        if (_reportBatchReceived >= _reportBatchCount) {
+          debugPrint('[数据管理] 报表查询完成: ${_reportBuffer.length} 条');
+          if (_reportQueryCompleter != null && !_reportQueryCompleter!.isCompleted) {
+            _reportQueryCompleter!.complete(List.unmodifiable(_reportBuffer));
+          }
+        }
+      } else {
+        debugPrint('[数据管理] 0x93 响应数据不足: ${bytes.length}字节');
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      }
+    } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x94) {
+      // 0x94：设备存储数据读取响应，命令 0x14 触发
+      // 帧结构：7D 94 [长度2B LE] [UNCONFIGED 10B] [4B开始时间] [1B序号] [120B数据] 0D
+      // 错误帧：[4B开始时间] [1B=0xFF]
+      if (bytes.length >= 20) {
+        final seq = bytes[18];
+        if (seq == 0xFF) {
+          debugPrint('[数据管理] 0x94 读取错误: 时间或序号无效');
+          emit(state.copyWith(lastReceived: bytes, rawLog: log));
+          if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+            _sleepDataCompleter!.complete([]);
+          }
+        } else if (bytes.length >= 140) {
+          // 解析 30 分钟 × 4 字节（bytes[19] 开始）
+          final records = <SleepMinuteRecord>[];
+          for (var i = 0; i < 30; i++) {
+            records.add(SleepMinuteRecord.fromBytes(bytes, 19 + i * 4));
+          }
+          debugPrint('[数据管理] 0x94 存储数据: seq=$seq, ${records.length} 分钟');
+          emit(state.copyWith(lastReceived: bytes, rawLog: log));
+          if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+            _sleepDataCompleter!.complete(records);
+          }
+        } else {
+          debugPrint('[数据管理] 0x94 数据不足: ${bytes.length}字节');
+          emit(state.copyWith(lastReceived: bytes, rawLog: log));
+          if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+            _sleepDataCompleter!.complete([]);
+          }
+        }
+      } else {
+        debugPrint('[数据管理] 0x94 响应过短: ${bytes.length}字节');
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+      }
     } else {
       // 未知数据类型：未匹配到已知帧头
       debugPrint('[数据管理] 未知数据类型 bytes[1]=0x${bytes.length >= 2 ? bytes[1].toRadixString(16) : '??'}: $bytes');
@@ -903,6 +1066,16 @@ class BleDataCubit extends Cubit<BleDataState> {
       _parametersCompleter!.complete(null);
     }
     _parametersCompleter = null;
+    _reportBuffer = [];
+    _reportBatchReceived = 0;
+    if (_reportQueryCompleter != null && !_reportQueryCompleter!.isCompleted) {
+      _reportQueryCompleter!.complete([]);
+    }
+    _reportQueryCompleter = null;
+    if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+      _sleepDataCompleter!.complete([]);
+    }
+    _sleepDataCompleter = null;
     _bleService.disableNotify();
     _bleService.clearCharacteristicCache();
     emit(const BleDataState());

@@ -49,6 +49,8 @@ lib/
     models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
     models/retransmit30_record.dart - Retransmit30Record（15字节/组：分钟级记录）
+    models/report_summary.dart       - ReportSummary（26字节：startTime/sleepLen/duration/start/end/spo2/avgHR/avgBR）
+    models/sleep_minute_record.dart  - SleepMinuteRecord（4字节/组：mode, heartRate, breathRate, bodyMove）
   l10n/
     app_en.arb              - English translations (template)
     app_zh.arb              - Chinese translations
@@ -62,7 +64,8 @@ lib/
     report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart,
                                       RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
                                       DeviceStatusTestCard, HeartbeatTestCard, PressureCalibrateTestCard,
-                                      ParameterTestCard, ClockCalibrateTestCard
+                                      ParameterTestCard, ClockCalibrateTestCard,
+                                      ReportQueryTestCard, ReportDetailTestCard, FirmwareVersionTestCard
     report/daily/
       daily_report_content.dart
       bloc/daily_report_cubit.dart
@@ -137,6 +140,8 @@ flutter run
   - 校准时钟（0x0B）→ 0x8B：无内容，发送4字节Unix时间戳LE
   - 固件版本（0x0C）→ 0x8C：版本字符串（如 `UiSleep_Pro_BLE_HVER810_FVER180`）
   - 恢复出厂（0x17）→ 0x97：无内容
+  - 报表查询（0x13）→ 0x93：15组×26字节 ReportSummary（分3批，每批5组），`sendReportQueryCommand()`
+  - 数据读取（0x14）→ 0x94：startTime + seq(0~47)，返回30分钟×4字节 SleepMinuteRecord，`sendSleepDataReadCommand(startTime, seq)`
   - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析
   - 详细协议文档见 `BLE_PROTOCOL.md`
 - **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除

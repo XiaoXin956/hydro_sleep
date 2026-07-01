@@ -37,8 +37,8 @@ class RetransmitRecord {
       status: bytes[offset + 5],
       heartRate: bytes[offset + 6],
       breathRate: bytes[offset + 7],
-      sdata: (bytes[offset + 8] << 8) | bytes[offset + 9],
-      pdata: (bytes[offset + 10] << 8) | bytes[offset + 11],
+      sdata: bytes[offset + 8] | (bytes[offset + 9] << 8),
+      pdata: bytes[offset + 10] | (bytes[offset + 11] << 8),
     );
   }
 

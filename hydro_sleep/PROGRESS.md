@@ -106,6 +106,18 @@
   - 响应帧结构：`bytes[0]` = 帧头，`bytes[1]` = 数据类型（A5 5A 设备信息除外）
 - [x] 我的页面固件版本显示
   - 通用设置新增"固件版本"行，BlocBuilder 实时同步 BleDataCubit.firmwareVersion
+- [x] 报表查询协议（0x13 / 0x93）
+  - `sendReportQueryCommand()` 发送 0x13，设备回复 0x93：15组×26字节 ReportSummary（分3批，每批5组，500ms间隔）
+  - ReportSummary 模型：startTime(4B)、sleepLen(1B)、duration(2B)、startPulse(2B)、startBreath(2B)、endPulse(2B)、endBreath(2B)、spo2(1B)、avgHR(1B)、avgBR(1B)
+  - ReportQueryTestCard 测试卡片（查询+列表展示，点击条目跳转数据读取）
+- [x] 数据读取协议（0x14 / 0x94）
+  - `sendSleepDataReadCommand(startTime, seq)` 发送 0x14，设备回复 0x94：30组×4字节 SleepMinuteRecord
+  - SleepMinuteRecord 模型：mode(1B)、heartRate(1B)、breathRate(1B)、bodyMove(1B)
+  - seq 范围 0~47（48包×30分钟 = 24小时），用 startTime 作为报表标识
+  - ReportDetailTestCard 测试卡片（显示单报表各 seq 的分钟数据）
+- [x] 设备版本测试卡片（FirmwareVersionTestCard）
+  - 显示 A5 5A 自动推送的设备信息（电源/模式/功率/时间/温度/低水位/NTC）
+  - 手动查询按钮触发 0x0C，显示固件版本字符串
 
 ## 待完成
 
@@ -117,7 +129,7 @@
 - [x] BleDataCubit — BLE 数据状态管理（服务发现 → 通知订阅 → 按 bytes[1] 数据类型分发）
 - [x] BleService 扩展 — discoverServices / enableNotify / writeData
 - [x] DeviceInfo 模型 — A5 5A 帧头解析
-- [x] BLE 协议命令实现 — 13个命令/响应对（0x01~0x0C, 0x17）+ 实时数据流（0x85/0x86）
+- [x] BLE 协议命令实现 — 15个命令/响应对（0x01~0x0C, 0x13, 0x14, 0x17）+ 实时数据流（0x85/0x86）
 - [ ] BleFrameParser — 完整帧解析（校验和验证、粘包/拆包处理）
 
 ### 功能开发

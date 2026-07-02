@@ -92,5 +92,8 @@
   "disconnect": "Disconnect",
   "permissionDenied": "Permission denied. Please enable Bluetooth and Location in Settings.",
   "openSettings": "Open Settings",
-  "reconnecting": "Reconnecting…"
+  "reconnecting": "Reconnecting…",
+  "delete": "Delete",
+  "deleteDevice": "Delete device",
+  "deleteDeviceConfirm": "Tap delete again within 2s to confirm"
 }

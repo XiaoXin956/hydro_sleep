@@ -78,5 +78,8 @@
   "disconnect": "断开连接",
   "permissionDenied": "权限被拒绝，请在设置中开启蓝牙和定位权限",
   "openSettings": "打开设置",
-  "reconnecting": "正在重连…"
+  "reconnecting": "正在重连…",
+  "delete": "删除",
+  "deleteDevice": "删除设备",
+  "deleteDeviceConfirm": "2秒内再次点击确认删除"
 }

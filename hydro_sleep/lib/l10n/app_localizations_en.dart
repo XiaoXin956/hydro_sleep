@@ -250,4 +250,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reconnecting => 'Reconnecting…';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get deleteDevice => 'Delete device';
+
+  @override
+  String get deleteDeviceConfirm => 'Tap delete again within 2s to confirm';
 }

@@ -53,4 +53,11 @@ class DeviceListCubit extends Cubit<DeviceListState> {
     emit(state.copyWith(devices: const []));
     await _loadDevices();
   }
+
+  Future<void> removeDevice(String deviceId) async {
+    await DeviceRepository.removeHistoryDevice(deviceId);
+    emit(state.copyWith(
+      devices: state.devices.where((d) => d.deviceId != deviceId).toList(),
+    ));
+  }
 }

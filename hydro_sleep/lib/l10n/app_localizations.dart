@@ -571,6 +571,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reconnecting…'**
   String get reconnecting;
+
+  /// No description provided for @delete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get delete;
+
+  /// No description provided for @deleteDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete device'**
+  String get deleteDevice;
+
+  /// No description provided for @deleteDeviceConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap delete again within 2s to confirm'**
+  String get deleteDeviceConfirm;
 }
 
 class _AppLocalizationsDelegate

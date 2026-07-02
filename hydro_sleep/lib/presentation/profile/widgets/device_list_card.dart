@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
@@ -74,7 +75,9 @@ class _DeviceListCardState extends State<DeviceListCard>
                     children: [
                       if (index > 0) _divider(theme),
                       _DeviceTile(
+                        key: ValueKey(device.deviceId),
                         theme: theme,
+                        deviceId: device.deviceId,
                         name: device.deviceName,
                         isConnecting: isCurrentDevice &&
                             (connectState.isConnecting || connectState.isReconnecting),
@@ -83,6 +86,9 @@ class _DeviceListCardState extends State<DeviceListCard>
                         onDisconnect: isCurrentDevice && connectState.isConnected
                             ? () => context.read<BleConnectCubit>().disconnect()
                             : null,
+                        onDelete: () => context
+                            .read<DeviceListCubit>()
+                            .removeDevice(device.deviceId),
                         l10n: l10n,
                       ),
                     ],
@@ -97,7 +103,9 @@ class _DeviceListCardState extends State<DeviceListCard>
                       for (var i = 0; i < overflowDevices.length; i++) ...[
                         _divider(theme),
                         _DeviceTile(
+                          key: ValueKey(overflowDevices[i].deviceId),
                           theme: theme,
+                          deviceId: overflowDevices[i].deviceId,
                           name: overflowDevices[i].deviceName,
                           isConnecting: (connectState.remoteId ==
                                       overflowDevices[i].deviceId) &&
@@ -111,6 +119,9 @@ class _DeviceListCardState extends State<DeviceListCard>
                               ? () =>
                                   context.read<BleConnectCubit>().disconnect()
                               : null,
+                          onDelete: () => context
+                              .read<DeviceListCubit>()
+                              .removeDevice(overflowDevices[i].deviceId),
                           l10n: l10n,
                         ),
                       ],
@@ -181,57 +192,116 @@ class _DeviceListCardState extends State<DeviceListCard>
   }
 }
 
-class _DeviceTile extends StatelessWidget {
+class _DeviceTile extends StatefulWidget {
   final ThemeData theme;
+  final String deviceId;
   final String name;
   final bool isConnecting;
   final bool isConnected;
   final VoidCallback? onDisconnect;
+  final VoidCallback? onDelete;
   final AppLocalizations l10n;
 
   const _DeviceTile({
+    super.key,
     required this.theme,
+    required this.deviceId,
     required this.name,
     required this.l10n,
     this.isConnecting = false,
     this.isConnected = false,
     this.onDisconnect,
+    this.onDelete,
   });
 
   @override
+  State<_DeviceTile> createState() => _DeviceTileState();
+}
+
+class _DeviceTileState extends State<_DeviceTile>
+    with SingleTickerProviderStateMixin {
+  bool _pendingDelete = false;
+  Timer? _deleteTimer;
+  late final AnimationController _countdownController;
+
+  static const _deleteTimeout = Duration(seconds: 2);
+
+  @override
+  void initState() {
+    super.initState();
+    _countdownController = AnimationController(
+      duration: _deleteTimeout,
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _deleteTimer?.cancel();
+    _countdownController.dispose();
+    super.dispose();
+  }
+
+  void _onDeleteTap() {
+    if (_pendingDelete) {
+      _deleteTimer?.cancel();
+      _countdownController.stop();
+      _countdownController.reset();
+      setState(() => _pendingDelete = false);
+      widget.onDelete?.call();
+    } else {
+      setState(() => _pendingDelete = true);
+      _countdownController.forward(from: 0);
+      _deleteTimer = Timer(_deleteTimeout, () {
+        if (mounted) {
+          setState(() => _pendingDelete = false);
+          _countdownController.reset();
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final theme = widget.theme;
+    final l10n = widget.l10n;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
+          // 设备图标
           Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: isConnected
+              color: widget.isConnected
                   ? AppColors.success.withValues(alpha: 0.1)
                   : AppColors.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
-              isConnected ? Icons.bluetooth_connected : Icons.bluetooth,
+              widget.isConnected
+                  ? Icons.bluetooth_connected
+                  : Icons.bluetooth,
               size: 20,
-              color: isConnected ? AppColors.success : AppColors.primary,
+              color: widget.isConnected ? AppColors.success : AppColors.primary,
             ),
           ),
           const SizedBox(width: 12),
+          // 设备信息
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  name,
+                  widget.name,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 2),
-                if (isConnecting)
+                if (widget.isConnecting)
                   Row(
                     children: [
                       SizedBox(
@@ -258,23 +328,27 @@ class _DeviceTile extends StatelessWidget {
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color:
-                              isConnected ? AppColors.success : AppColors.error,
+                          color: widget.isConnected
+                              ? AppColors.success
+                              : AppColors.error,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isConnected ? l10n.connected : l10n.disconnected,
+                        widget.isConnected
+                            ? l10n.connected
+                            : l10n.disconnected,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color:
-                              isConnected ? AppColors.success : AppColors.error,
+                          color: widget.isConnected
+                              ? AppColors.success
+                              : AppColors.error,
                         ),
                       ),
-                      if (onDisconnect != null) ...[
+                      if (widget.onDisconnect != null) ...[
                         const SizedBox(width: 8),
                         GestureDetector(
-                          onTap: onDisconnect,
+                          onTap: widget.onDisconnect,
                           child: Text(
                             l10n.disconnect,
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -288,6 +362,56 @@ class _DeviceTile extends StatelessWidget {
               ],
             ),
           ),
+          // 删除按钮（已连接设备不显示）
+          if (widget.onDelete != null && !widget.isConnected)
+            GestureDetector(
+              onTap: _onDeleteTap,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: _pendingDelete
+                      ? Colors.red.withValues(alpha: 0.08)
+                      : Colors.transparent,
+                  shape: BoxShape.circle,
+                ),
+                child: AnimatedBuilder(
+                  animation: _countdownController,
+                  builder: (context, _) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        if (_pendingDelete)
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: CircularProgressIndicator(
+                              value: _countdownController.value,
+                              strokeWidth: 2.5,
+                              color: Colors.red,
+                              backgroundColor: Colors.red.withValues(alpha: 0.15),
+                            ),
+                          ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          transitionBuilder: (child, anim) =>
+                              ScaleTransition(scale: anim, child: child),
+                          child: Icon(
+                            _pendingDelete
+                                ? Icons.delete_forever
+                                : Icons.delete_outline,
+                            key: ValueKey(_pendingDelete),
+                            size: 18,
+                            color: _pendingDelete ? Colors.red : Colors.grey,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
         ],
       ),
     );

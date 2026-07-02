@@ -248,4 +248,13 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get reconnecting => '正在重连…';
+
+  @override
+  String get delete => '删除';
+
+  @override
+  String get deleteDevice => '删除设备';
+
+  @override
+  String get deleteDeviceConfirm => '2秒内再次点击确认删除';
 }

@@ -31,6 +31,8 @@ class FactoryResetCubit extends Cubit<FactoryResetState> {
   final BleDataCubit _dataCubit;
 
   /// 恢复出厂设置：发送 0x17，等待设备回复 0x97
+  static const _factoryResetCommand = [0x7D, 0x17];
+
   Future<void> reset() async {
     if (state.isLoading) return;
 
@@ -46,7 +48,7 @@ class FactoryResetCubit extends Cubit<FactoryResetState> {
     emit(const FactoryResetState(status: FactoryResetStatus.loading));
 
     try {
-      final success = await _dataCubit.sendCommand([0x17]);
+      final success = await _dataCubit.sendCommand(_factoryResetCommand);
       if (success) {
         debugPrint('[恢复出厂] 设备回复 0x97，操作成功');
         emit(const FactoryResetState(status: FactoryResetStatus.success));

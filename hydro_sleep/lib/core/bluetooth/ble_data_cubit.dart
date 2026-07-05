@@ -823,7 +823,7 @@ class BleDataCubit extends Cubit<BleDataState> {
           !_firmwareVersionCompleter!.isCompleted) {
         _firmwareVersionCompleter!.complete(version);
       }
-    } else if (bytes.length >= 2 && bytes[1] == _headerResponse) {
+    } else if (bytes.length >= 2 && bytes[0] == 0x7D && bytes[1] == _headerResponse) {
       // 0x97：恢复出厂设置完成响应，命令 0x17 触发
       debugPrint('[数据管理] 收到 0x97 响应: $bytes');
       emit(state.copyWith(lastReceived: bytes, rawLog: log));

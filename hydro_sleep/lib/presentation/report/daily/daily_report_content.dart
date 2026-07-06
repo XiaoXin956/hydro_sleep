@@ -16,6 +16,7 @@ import 'package:hydro_sleep/presentation/report/widgets/clock_calibrate_test_car
 import 'package:hydro_sleep/presentation/report/widgets/report_query_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/report_detail_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/firmware_version_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/report_storage_test_card.dart';
 
 /// 日报告内容
 class DailyReportContent extends StatelessWidget {
@@ -63,10 +64,12 @@ class DailyReportContent extends StatelessWidget {
                 const ReportDetailTestCard(),
                 const SizedBox(height: 16),
                 const FirmwareVersionTestCard(),
+                const SizedBox(height: 16),
+                const ReportStorageTestCard(),
                 const SizedBox(height: 40),
               ];
               return items[index];
-            }, childCount: 34),
+            }, childCount: 36),
           ),
         ),
       ],

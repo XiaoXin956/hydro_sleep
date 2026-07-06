@@ -34,13 +34,13 @@ class ReportSummary {
 
   /// 从 26 字节解析（offset 为该组数据在帧中的起始位置）
   factory ReportSummary.fromBytes(List<int> bytes, int offset) {
-    // 时间戳 4 字节 LE
+    // 时间戳 4 字节 BE（设备发送大端序）
     final t0 = bytes[offset];
     final t1 = bytes[offset + 1];
     final t2 = bytes[offset + 2];
     final t3 = bytes[offset + 3];
     final isAllFF = t0 == 0xFF && t1 == 0xFF && t2 == 0xFF && t3 == 0xFF;
-    final timeRaw = t0 | (t1 << 8) | (t2 << 16) | (t3 << 24);
+    final timeRaw = (t0 << 24) | (t1 << 16) | (t2 << 8) | t3;
 
     return ReportSummary(
       startTime: isAllFF || timeRaw == 0

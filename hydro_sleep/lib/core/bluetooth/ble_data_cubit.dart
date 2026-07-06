@@ -13,6 +13,7 @@ import 'package:hydro_sleep/domain/models/retransmit_record.dart';
 import 'package:hydro_sleep/domain/models/retransmit30_record.dart';
 import 'package:hydro_sleep/domain/models/report_summary.dart';
 import 'package:hydro_sleep/domain/models/sleep_minute_record.dart';
+import 'package:hydro_sleep/data/repositories/sleep_data_repository.dart';
 
 // --- Status ---
 
@@ -144,6 +145,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   List<ReportSummary> _reportBuffer = [];
   static const _reportBatchCount = 3; // 设备分 3 批发送
   int _reportBatchReceived = 0;
+  String _lastReportAsciiId = '';
 
   // 存储数据读取相关（0x14/0x94）
   Completer<List<SleepMinuteRecord>>? _sleepDataCompleter;
@@ -495,6 +497,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   }
 
   /// 发送设备存储报表查询 0x13，等待设备回复 3 批 0x93 数据（共 15 组报表概要）
+  /// 0x93 响应到达后自动保存到本地 Isar 数据库
   Future<List<ReportSummary>> sendReportQueryCommand({
     Duration timeout = const Duration(seconds: 10),
   }) async {
@@ -506,6 +509,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _reportQueryCompleter = Completer<List<ReportSummary>>();
     _reportBuffer = [];
     _reportBatchReceived = 0;
+    _lastReportAsciiId = '';
     try {
       await _bleService.writeData(_reportQueryCommand);
       debugPrint('[数据管理] 报表查询已发送，等待 0x93 响应...');
@@ -718,7 +722,8 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const _maxLogEntries = 200;
 
   void _onDataReceived(List<int> bytes) {
-    debugPrint('[数据管理] 收到数据 (${bytes.length}字节): $bytes');
+    final hexStr = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    debugPrint('[数据管理] 收到数据 (${bytes.length}字节): $hexStr');
 
     if (bytes.isEmpty) return;
 
@@ -962,13 +967,19 @@ class BleDataCubit extends Cubit<BleDataState> {
       // 帧结构：7D 93 [长度2B LE] [UNCONFIGED 10B] [序号1B] [5组×26B] 0D
       // 设备分 3 批发送（间隔 300ms），序号 = 0/1/2
       if (bytes.length >= 28) {
+        // 提取 ASCII ID（bytes[4..13]）
+        _lastReportAsciiId = String.fromCharCodes(bytes.sublist(4, 14));
         // 内容从 bytes[14] 开始（跳过帧头+类型+长度+UNCONFIGED）
         final seq = bytes[14];
-        debugPrint('[数据管理] 0x93 报表批次 $seq/2，${bytes.length}字节');
+        final frameHex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+        debugPrint('[数据管理] 0x93 报表批次 $seq/2，${bytes.length}字节，asciiId=$_lastReportAsciiId');
+        debugPrint('[数据管理] 0x93 帧原始数据: $frameHex');
         // 解析本批 5 组 × 26 字节（bytes[15] 开始）
         for (var i = 0; i < 5; i++) {
           final offset = 15 + i * 26;
           if (offset + 26 <= bytes.length - 1) { // 留出尾帧 0D
+            final raw = bytes.sublist(offset, offset + 26);
+            debugPrint('[数据管理] 0x93 组$i 原始数据: ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
             _reportBuffer.add(ReportSummary.fromBytes(bytes, offset));
           }
         }
@@ -976,6 +987,19 @@ class BleDataCubit extends Cubit<BleDataState> {
         emit(state.copyWith(lastReceived: bytes, rawLog: log));
         if (_reportBatchReceived >= _reportBatchCount) {
           debugPrint('[数据管理] 报表查询完成: ${_reportBuffer.length} 条');
+          // 收到全部 3 批，自动保存到数据库
+          final deviceId = _connectCubit.state.remoteId;
+          if (deviceId != null && _reportBuffer.isNotEmpty) {
+            SleepDataRepository.saveReportSummaries(
+              deviceId: deviceId,
+              asciiId: _lastReportAsciiId,
+              summaries: List.unmodifiable(_reportBuffer),
+            ).then((_) {
+              debugPrint('[数据管理] 报表已自动保存到数据库: ${_reportBuffer.length} 条');
+            }).catchError((e) {
+              debugPrint('[数据管理] 报表保存数据库失败: $e');
+            });
+          }
           if (_reportQueryCompleter != null && !_reportQueryCompleter!.isCompleted) {
             _reportQueryCompleter!.complete(List.unmodifiable(_reportBuffer));
           }

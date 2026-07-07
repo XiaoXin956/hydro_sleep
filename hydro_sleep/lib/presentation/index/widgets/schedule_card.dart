@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:hydro_sleep/core/constants/app_constants.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 
@@ -11,6 +12,7 @@ class ScheduleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final workTime = context.watch<BleDataCubit>().state.deviceInfo?.workTime;
 
     return Card(
       child: Padding(
@@ -23,44 +25,20 @@ class ScheduleCard extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-            _TimeChip(
-              label: AppConstants.defaultScheduleStart,
-              onTap: () {},
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TimeChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _TimeChip({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.access_time, size: 16, color: AppColors.primary),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.access_time, size: 20, color: workTime != null ? AppColors.primary : AppColors.textHint),
+                  const SizedBox(width: 6),
+                  Text(
+                    workTime != null ? l10n.workTimeHours(workTime) : '--',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: workTime != null ? AppColors.primary : AppColors.textHint,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

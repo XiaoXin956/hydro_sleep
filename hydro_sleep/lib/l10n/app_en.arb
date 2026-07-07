@@ -59,6 +59,17 @@
   "manualMode": "Manual",
   "schedule": "Schedule",
   "workTimeTitle": "Work Time",
+  "workTimeHours": "{hours} h",
+  "@workTimeHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "waterLevel": "Water Level",
+  "waterLevelNormal": "Normal",
+  "waterLevelAbnormal": "Abnormal",
   "autoAdjustDuringSleep": "Auto adjust during sleep",
   "searchDevice": "Search Device",
   "availableDevices": "Available Devices",

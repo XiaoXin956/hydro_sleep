@@ -148,6 +148,20 @@ class AppLocalizationsZh extends AppLocalizations {
   String get workTimeTitle => '工作时间';
 
   @override
+  String workTimeHours(int hours) {
+    return '$hours 小时';
+  }
+
+  @override
+  String get waterLevel => '水位';
+
+  @override
+  String get waterLevelNormal => '正常';
+
+  @override
+  String get waterLevelAbnormal => '异常';
+
+  @override
   String get autoAdjustDuringSleep => '睡眠期间自动调节';
 
   @override

@@ -45,6 +45,17 @@
   "manualMode": "手动模式",
   "schedule": "日程",
   "workTimeTitle": "工作时间",
+  "workTimeHours": "{hours} 小时",
+  "@workTimeHours": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "waterLevel": "水位",
+  "waterLevelNormal": "正常",
+  "waterLevelAbnormal": "异常",
   "autoAdjustDuringSleep": "睡眠期间自动调节",
   "searchDevice": "搜索设备",
   "availableDevices": "可用设备",

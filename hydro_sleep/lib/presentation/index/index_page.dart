@@ -3,6 +3,7 @@ import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/index/widgets/ble_debug_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/connection_status_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/mode_selection_card.dart';
+import 'package:hydro_sleep/presentation/index/widgets/water_level_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/schedule_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/temperature_control_card.dart';
 
@@ -37,6 +38,8 @@ class IndexPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   const ModeSelectionCard(),
                   const SizedBox(height: 16),
+                  const WaterLevelCard(),
+                  const SizedBox(height: 16),
                   const TemperatureControlCard(),
                   const SizedBox(height: 16),
                   const ScheduleCard(),
@@ -46,7 +49,7 @@ class IndexPage extends StatelessWidget {
                 ];
                 return items[index];
               },
-              childCount: 10,
+              childCount: 12,
             ),
           ),
         ),

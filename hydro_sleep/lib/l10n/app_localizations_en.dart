@@ -148,6 +148,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get workTimeTitle => 'Work Time';
 
   @override
+  String workTimeHours(int hours) {
+    return '$hours h';
+  }
+
+  @override
+  String get waterLevel => 'Water Level';
+
+  @override
+  String get waterLevelNormal => 'Normal';
+
+  @override
+  String get waterLevelAbnormal => 'Abnormal';
+
+  @override
   String get autoAdjustDuringSleep => 'Auto adjust during sleep';
 
   @override

@@ -368,6 +368,30 @@ abstract class AppLocalizations {
   /// **'Work Time'**
   String get workTimeTitle;
 
+  /// No description provided for @workTimeHours.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h'**
+  String workTimeHours(int hours);
+
+  /// No description provided for @waterLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Water Level'**
+  String get waterLevel;
+
+  /// No description provided for @waterLevelNormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Normal'**
+  String get waterLevelNormal;
+
+  /// No description provided for @waterLevelAbnormal.
+  ///
+  /// In en, this message translates to:
+  /// **'Abnormal'**
+  String get waterLevelAbnormal;
+
   /// No description provided for @autoAdjustDuringSleep.
   ///
   /// In en, this message translates to:

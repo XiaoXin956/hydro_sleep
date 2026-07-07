@@ -409,6 +409,39 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
+  /// 发送设备控制帧 [A5 5A 电源 模式 功率 时间 目标温度 低水位 实际温度 0]
+  /// 读取当前 deviceInfo，仅覆盖非 null 字段后写入
+  Future<bool> sendDeviceControlCommand({
+    int? power,
+    int? mode,
+    int? workPower,
+    int? workTime,
+    int? targetTemp,
+    int? lowWater,
+    int? actualTemp,
+  }) async {
+    if (state.status != BleDataStatus.streaming) return false;
+    final info = state.deviceInfo;
+    if (info == null) return false;
+
+    final ntcHigh = actualTemp ?? info.actualTemp;
+
+    final frame = [
+      0xA5, 0x5A,
+      power      ?? info.powerStatus,
+      mode       ?? info.workMode,
+      workPower  ?? info.workPower,
+      workTime   ?? info.workTime,
+      targetTemp ?? info.targetTemp,
+      lowWater   ?? info.lowWater,
+      ntcHigh,
+      0x00,
+    ];
+    debugPrint('[数据管理] sendDeviceControlCommand: ${frame.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+    await _bleService.writeData(frame);
+    return true;
+  }
+
   /// 查询设备状态 0x07，等待 0x87 响应
   /// 返回 DeviceStatus（模式+错误+设备时间），null 表示超时或异常
   Future<DeviceStatus?> sendDeviceStatusCommand({

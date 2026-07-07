@@ -107,9 +107,9 @@ class _FirmwareVersionTestCardState extends State<FirmwareVersionTestCard> {
                   _infoRow('工作模式', info.modeName),
                   _infoRow('功率', '${info.workPower}%'),
                   _infoRow('工作时间', '${info.workTime} min'),
-                  _infoRow('温度', '${info.workTemp}°C'),
+                  _infoRow('目标温度', '${info.targetTemp}°C'),
                   _infoRow('低水位', info.lowWater == 1 ? '是' : '否'),
-                  _infoRow('NTC', '${info.ntcValue}'),
+                  _infoRow('实际温度', '${info.actualTemp}°C'),
                 ] else
                   Text(
                     '未收到设备信息（A5 5A）',

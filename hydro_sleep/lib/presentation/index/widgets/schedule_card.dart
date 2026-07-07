@@ -3,16 +3,9 @@ import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 
-/// 日程卡片
-class ScheduleCard extends StatefulWidget {
+/// 工作时间卡片
+class ScheduleCard extends StatelessWidget {
   const ScheduleCard({super.key});
-
-  @override
-  State<ScheduleCard> createState() => _ScheduleCardState();
-}
-
-class _ScheduleCardState extends State<ScheduleCard> {
-  bool _autoAdjust = true;
 
   @override
   Widget build(BuildContext context) {
@@ -26,48 +19,13 @@ class _ScheduleCardState extends State<ScheduleCard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              l10n.schedule,
+              l10n.workTimeTitle,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _TimeChip(
-                    label: AppConstants.defaultScheduleStart,
-                    onTap: () {},
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
-                  child: Text('→', style: TextStyle(fontSize: 18)),
-                ),
-                Expanded(
-                  child: _TimeChip(
-                    label: AppConstants.defaultScheduleEnd,
-                    onTap: () {},
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.autoAdjustDuringSleep,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-                Switch(
-                  value: _autoAdjust,
-                  activeThumbColor: AppColors.primary,
-                  onChanged: (value) {
-                    setState(() => _autoAdjust = value);
-                  },
-                ),
-              ],
+            _TimeChip(
+              label: AppConstants.defaultScheduleStart,
+              onTap: () {},
             ),
           ],
         ),

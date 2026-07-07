@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/constants/app_constants.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
@@ -21,13 +22,56 @@ class TemperatureControlCard extends StatefulWidget {
 
 class _TemperatureControlCardState extends State<TemperatureControlCard> {
   double _targetTemp = 24.0;
+  bool _userDragging = false;
+  bool _sending = false;
+  int? _lastSyncedDeviceTemp;
+
+  void _syncFromDevice(int deviceTemp) {
+    if (_lastSyncedDeviceTemp == deviceTemp) return;
+    _lastSyncedDeviceTemp = deviceTemp;
+    if (!_userDragging && !_sending) {
+      _targetTemp = deviceTemp.toDouble().clamp(15.0, 30.0);
+    }
+  }
+
+  Future<void> _sendTargetTemp(double temp) async {
+    if (_sending) return;
+    final isConnected =
+        context.read<BleConnectCubit>().state.status == BleConnectStatus.connected;
+    if (!isConnected) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未连接设备'), duration: Duration(seconds: 2)),
+        );
+      }
+      return;
+    }
+
+    setState(() => _sending = true);
+    final ok = await context
+        .read<BleDataCubit>()
+        .sendDeviceControlCommand(targetTemp: temp.toInt());
+    if (mounted) {
+      setState(() => _sending = false);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('温度设置失败'), duration: Duration(seconds: 2)),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
     final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
-    final currentTemp = deviceInfo?.workTemp;
+    final currentTemp = deviceInfo?.actualTemp;
+
+    // 从设备同步目标温度
+    if (deviceInfo != null) {
+      _syncFromDevice(deviceInfo.targetTemp);
+    }
 
     return Card(
       child: Padding(
@@ -35,23 +79,18 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              l10n.temperature,
-              style: theme.textTheme.titleMedium,
-            ),
+            Text(l10n.temperature, style: theme.textTheme.titleMedium),
             const SizedBox(height: 16),
+            // 实际温度
             Text(
-              currentTemp != null
-                  ? l10n.currentTemp(currentTemp)
-                  : l10n.currentTemp(0),
+              currentTemp != null ? l10n.currentTemp(currentTemp) : l10n.currentTemp(0),
               style: theme.textTheme.titleLarge?.copyWith(
-                color: currentTemp != null
-                    ? AppColors.primary
-                    : AppColors.textHint,
+                color: currentTemp != null ? AppColors.primary : AppColors.textHint,
                 fontWeight: FontWeight.bold,
               ),
             ),
             const SizedBox(height: 4),
+            // 滑块
             Row(
               children: [
                 const Text('15°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
@@ -64,7 +103,14 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
                     divisions: 15,
                     label: '${_targetTemp.toInt()}°',
                     onChanged: (value) {
-                      setState(() => _targetTemp = value);
+                      setState(() {
+                        _userDragging = true;
+                        _targetTemp = value;
+                      });
+                    },
+                    onChangeEnd: (value) {
+                      _userDragging = false;
+                      _sendTargetTemp(value);
                     },
                   ),
                 ),
@@ -72,12 +118,25 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
               ],
             ),
             Center(
-              child: Text(
-                l10n.targetTemp(_targetTemp.toInt()),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.targetTemp(_targetTemp.toInt()),
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: _sending
+                        ? const CircularProgressIndicator(strokeWidth: 2)
+                        : null,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 4),
@@ -110,18 +169,17 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
         final preset = presets[index];
         final isSelected = _targetTemp == preset.temp;
         return InkWell(
-          onTap: () => setState(() => _targetTemp = preset.temp),
+          onTap: () {
+            setState(() => _targetTemp = preset.temp);
+            _sendTargetTemp(preset.temp);
+          },
           child: Container(
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? AppColors.primary.withValues(alpha: 0.1)
-                  : null,
+              color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected
-                    ? AppColors.primary
-                    : AppColors.divider,
+                color: isSelected ? AppColors.primary : AppColors.divider,
                 width: 1,
               ),
             ),

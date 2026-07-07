@@ -182,6 +182,24 @@ abstract class AppLocalizations {
   /// **'Mode Preference'**
   String get modePreference;
 
+  /// No description provided for @modeAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get modeAuto;
+
+  /// No description provided for @modeCooling.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooling'**
+  String get modeCooling;
+
+  /// No description provided for @modeHeating.
+  ///
+  /// In en, this message translates to:
+  /// **'Heating'**
+  String get modeHeating;
+
   /// No description provided for @bedExitShutdown.
   ///
   /// In en, this message translates to:
@@ -343,6 +361,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Schedule'**
   String get schedule;
+
+  /// No description provided for @workTimeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Work Time'**
+  String get workTimeTitle;
 
   /// No description provided for @autoAdjustDuringSleep.
   ///

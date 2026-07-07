@@ -2,12 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 
 /// 连接状态卡片
-class ConnectionStatusCard extends StatelessWidget {
+class ConnectionStatusCard extends StatefulWidget {
   const ConnectionStatusCard({super.key});
+
+  @override
+  State<ConnectionStatusCard> createState() => _ConnectionStatusCardState();
+}
+
+class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
+  bool _togglingPower = false;
+
+  Future<void> _togglePower(int currentPower) async {
+    if (_togglingPower) return;
+    setState(() => _togglingPower = true);
+    final newPower = currentPower == 1 ? 0 : 1;
+    final ok = await context.read<BleDataCubit>().sendDeviceControlCommand(power: newPower);
+    if (mounted) {
+      setState(() => _togglingPower = false);
+      if (!ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('电源控制失败'), duration: Duration(seconds: 2)),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -86,25 +109,43 @@ class ConnectionStatusCard extends StatelessWidget {
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
           const SizedBox(width: 8),
-          Text(
-            deviceName ?? '',
-            style: theme.textTheme.bodyMedium,
-          ),
+          Text(deviceName ?? '', style: theme.textTheme.bodyMedium),
         ],
       );
     }
 
     if (isConnected) {
+      final powerStatus = context.watch<BleDataCubit>().state.deviceInfo?.powerStatus ?? 0;
+      final isOn = powerStatus == 1;
+
       return Row(
         children: [
           const Icon(Icons.check_circle, color: AppColors.success, size: 20),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              deviceName ?? '',
-              style: theme.textTheme.bodyMedium,
-            ),
+            child: Text(deviceName ?? '', style: theme.textTheme.bodyMedium),
           ),
+          _togglingPower
+          ? const SizedBox(
+              width: 40,
+              height: 40,
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          : GestureDetector(
+              onTap: () => _togglePower(powerStatus),
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: Icon(
+                  Icons.power_settings_new,
+                  color: isOn ? AppColors.success : AppColors.textHint,
+                  size: 24,
+                ),
+              ),
+            ),
+          const SizedBox(width: 4),
           TextButton(
             onPressed: () => context.read<BleConnectCubit>().disconnect(),
             style: TextButton.styleFrom(

@@ -51,6 +51,15 @@ class AppLocalizationsZh extends AppLocalizations {
   String get modePreference => '模式偏好';
 
   @override
+  String get modeAuto => '自动';
+
+  @override
+  String get modeCooling => '制冷';
+
+  @override
+  String get modeHeating => '制热';
+
+  @override
   String get bedExitShutdown => '离床关机';
 
   @override
@@ -134,6 +143,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get schedule => '日程';
+
+  @override
+  String get workTimeTitle => '工作时间';
 
   @override
   String get autoAdjustDuringSleep => '睡眠期间自动调节';

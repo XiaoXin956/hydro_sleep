@@ -51,6 +51,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get modePreference => 'Mode Preference';
 
   @override
+  String get modeAuto => 'Auto';
+
+  @override
+  String get modeCooling => 'Cooling';
+
+  @override
+  String get modeHeating => 'Heating';
+
+  @override
   String get bedExitShutdown => 'Bed Exit Shutdown';
 
   @override
@@ -134,6 +143,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get schedule => 'Schedule';
+
+  @override
+  String get workTimeTitle => 'Work Time';
 
   @override
   String get autoAdjustDuringSleep => 'Auto adjust during sleep';

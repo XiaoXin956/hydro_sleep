@@ -116,8 +116,22 @@
   - seq 范围 0~47（48包×30分钟 = 24小时），用 startTime 作为报表标识
   - ReportDetailTestCard 测试卡片（显示单报表各 seq 的分钟数据）
 - [x] 设备版本测试卡片（FirmwareVersionTestCard）
-  - 显示 A5 5A 自动推送的设备信息（电源/模式/功率/时间/温度/低水位/NTC）
+  - 显示 A5 5A 自动推送的设备信息（电源/模式/功率/时间/目标温度/低水位/实际温度）
   - 手动查询按钮触发 0x0C，显示固件版本字符串
+
+### 2026-07-07
+- [x] DeviceInfo 字段重构
+  - `workTemp` → `targetTemp`（[6] 目标温度），`ntcValue` → `actualTemp`（[8] 实际温度，单字节）
+  - BleDataCubit `sendDeviceControlCommand` 同步更新
+- [x] 首页 BLE 设备控制功能
+  - ConnectionStatusCard：电源开关按钮（power=0/1），固定 40×40 布局防止切换抖动
+  - ModeSelectionCard：三模式选择（自动0/制冷1/制热2），发送 `sendDeviceControlCommand(mode:)`
+  - TemperatureControlCard：滑块 `onChangeEnd` + 预设点击发送 `sendDeviceControlCommand(targetTemp:)`，同步设备状态，固定 16×16 spinner 位置
+  - sendDeviceControlCommand：读取当前 DeviceInfo 状态，覆盖指定字段后发送 11 字节控制帧
+- [x] 首页 ScheduleCard 简化
+  - 标题改为"工作时间"，删除"睡眠期间自动调节"开关，只显示一个时间 chip
+- [x] 通用设置 BlocBuilder 重构
+  - ModePreferenceSelector 改用 BlocBuilder 实时同步设备 workMode 状态
 
 ## 待完成
 
@@ -130,10 +144,11 @@
 - [x] BleService 扩展 — discoverServices / enableNotify / writeData
 - [x] DeviceInfo 模型 — A5 5A 帧头解析
 - [x] BLE 协议命令实现 — 15个命令/响应对（0x01~0x0C, 0x13, 0x14, 0x17）+ 实时数据流（0x85/0x86）
+- [x] 首页设备控制 — sendDeviceControlCommand（电源/模式/温度），BlocBuilder 实时同步
 - [ ] BleFrameParser — 完整帧解析（校验和验证、粘包/拆包处理）
 
 ### 功能开发
-- [ ] 实时数据采集与展示（首页数据卡片填充）
+- [ ] 实时数据采集与展示（首页数据卡片完善）
 - [ ] 睡眠数据分析算法
 - [ ] 日期选择器（报告页 DateHeader）
 

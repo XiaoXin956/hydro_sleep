@@ -44,7 +44,7 @@ lib/
   domain/
     enums/sleep_stage.dart  - SleepStage, ReportSleepStage enums
     models/history_device.dart - HistoryDevice (Equatable, JSON serialization)
-    models/device_info.dart    - DeviceInfo（A5 5A 帧头解析，温度/模式/状态）
+    models/device_info.dart    - DeviceInfo（A5 5A 帧头解析：powerStatus[2], workMode[3], workPower[4], workTime[5], targetTemp[6], lowWater[7], actualTemp[8]）
     models/device_status.dart  - DeviceStatus（6字节：模式、错误码、时间戳）
     models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
@@ -59,7 +59,7 @@ lib/
     startup/startup_page.dart         - Splash screen (auto-navigate to /home after 2s)
     home/home_page.dart               - Tab shell (BottomNavigationBar, 3 tabs)
     index/index_page.dart             - Home tab content
-    index/widgets/                    - ConnectionStatusCard, ModeSelectionCard, TemperatureControlCard, ScheduleCard
+    index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard
     report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly/Yearly)
     report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart,
                                       RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
@@ -142,6 +142,7 @@ flutter run
   - 恢复出厂（0x17）→ 0x97：无内容
   - 报表查询（0x13）→ 0x93：15组×26字节 ReportSummary（分3批，每批5组），`sendReportQueryCommand()`
   - 数据读取（0x14）→ 0x94：startTime + seq(0~47)，返回30分钟×4字节 SleepMinuteRecord，`sendSleepDataReadCommand(startTime, seq)`
-  - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析
+  - 设备控制：`sendDeviceControlCommand(power/mode/workPower/workTime/targetTemp/lowWater)` 读取当前 `DeviceInfo` 状态，覆盖指定字段后发送 11 字节 `[A5 5A ...]` 帧
+  - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析（workMode: 0=自动, 1=制冷, 2=制热）
   - 详细协议文档见 `BLE_PROTOCOL.md`
 - **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除

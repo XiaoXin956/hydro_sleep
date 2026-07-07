@@ -63,6 +63,8 @@ class BleService {
 
   // --- Connection ---
 
+  static const _preferredMtu = 512;
+
   Future<void> connect(
     String remoteId, {
     Duration timeout = const Duration(seconds: 15),
@@ -75,9 +77,18 @@ class BleService {
     await device.connect(
       timeout: timeout,
       autoConnect: autoConnect,
-      mtu: autoConnect ? null : 247,
+      mtu: autoConnect ? null : _preferredMtu,
       license: License.nonprofit,
     );
+    // 连接后统一请求 MTU（autoConnect 模式下 connect 不会自动请求）
+    if (autoConnect) {
+      try {
+        final mtu = await device.requestMtu(_preferredMtu);
+        debugPrint('[蓝牙服务] MTU 协商结果: $mtu');
+      } catch (e) {
+        debugPrint('[蓝牙服务] MTU 请求失败: $e');
+      }
+    }
     debugPrint('[蓝牙服务] 连接完成: $remoteId');
   }
 

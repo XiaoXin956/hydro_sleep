@@ -755,8 +755,11 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const _maxLogEntries = 200;
 
   void _onDataReceived(List<int> bytes) {
-    final hexStr = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
-    debugPrint('[数据管理] 收到数据 (${bytes.length}字节): $hexStr');
+    final remoteId = _connectCubit.state.remoteId;
+    final mtu = remoteId != null
+        ? BluetoothDevice.fromId(remoteId).mtuNow
+        : 0;
+    debugPrint('[数据管理] MTU=$mtu, 收到数据 (${bytes.length}字节): ${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
 
     if (bytes.isEmpty) return;
 

@@ -314,12 +314,6 @@ abstract class AppLocalizations {
   /// **'Month'**
   String get dateMonth;
 
-  /// No description provided for @dateYear.
-  ///
-  /// In en, this message translates to:
-  /// **'Year'**
-  String get dateYear;
-
   /// No description provided for @temperature.
   ///
   /// In en, this message translates to:

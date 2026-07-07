@@ -36,7 +36,6 @@
   "dateDay": "日",
   "dateWeek": "周",
   "dateMonth": "月",
-  "dateYear": "年",
   "temperature": "温度",
   "currentTemp": "当前温度 {temp}°C",
   "targetTemp": "目标温度 {temp}°C",

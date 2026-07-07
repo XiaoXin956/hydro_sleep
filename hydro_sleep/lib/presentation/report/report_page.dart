@@ -4,9 +4,8 @@ import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/report/daily/daily_report_content.dart';
 import 'package:hydro_sleep/presentation/report/weekly/weekly_report_content.dart';
 import 'package:hydro_sleep/presentation/report/monthly/monthly_report_content.dart';
-import 'package:hydro_sleep/presentation/report/yearly/yearly_report_content.dart';
 
-/// 报告页 — 日/周/月/年 Tab 切换
+/// 报告页 — 日/周/月 Tab 切换
 class ReportPage extends StatefulWidget {
   const ReportPage({super.key});
 
@@ -21,7 +20,7 @@ class _ReportPageState extends State<ReportPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -73,7 +72,6 @@ class _ReportPageState extends State<ReportPage>
                 Tab(text: l10n.dateDay),
                 Tab(text: l10n.dateWeek),
                 Tab(text: l10n.dateMonth),
-                Tab(text: l10n.dateYear),
               ],
             ),
           ),
@@ -85,7 +83,6 @@ class _ReportPageState extends State<ReportPage>
             DailyReportContent(),
             WeeklyReportContent(),
             MonthlyReportContent(),
-            YearlyReportContent(),
           ],
         ),
       ),

@@ -117,9 +117,6 @@ class AppLocalizationsZh extends AppLocalizations {
   String get dateMonth => '月';
 
   @override
-  String get dateYear => '年';
-
-  @override
   String get temperature => '温度';
 
   @override

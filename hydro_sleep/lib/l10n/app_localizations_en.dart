@@ -117,9 +117,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dateMonth => 'Month';
 
   @override
-  String get dateYear => 'Year';
-
-  @override
   String get temperature => 'Temperature';
 
   @override

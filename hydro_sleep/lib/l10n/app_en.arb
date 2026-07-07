@@ -36,7 +36,6 @@
   "dateDay": "Day",
   "dateWeek": "Week",
   "dateMonth": "Month",
-  "dateYear": "Year",
   "temperature": "Temperature",
   "currentTemp": "Current Temp {temp}°C",
   "@currentTemp": {

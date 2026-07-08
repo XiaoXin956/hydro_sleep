@@ -32,6 +32,8 @@ class DeviceInfo {
     );
   }
 
+  bool get isPoweredOff => powerStatus == 0;
+
   String get modeName => switch (workMode) {
         0 => '自动',
         1 => '制冷',

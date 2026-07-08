@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
+import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dart';
@@ -24,6 +27,20 @@ class DailyReportContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => DailyReportCubit(
+        connectCubit: context.read<BleConnectCubit>(),
+      )..selectDate(DateTime.now()),
+      child: const _DailyReportBody(),
+    );
+  }
+}
+
+class _DailyReportBody extends StatelessWidget {
+  const _DailyReportBody();
+
+  @override
+  Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -31,7 +48,12 @@ class DailyReportContent extends StatelessWidget {
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate((context, index) {
               final items = <Widget>[
-                const DateHeader(period: DatePeriod.day),
+                DateHeader(
+                  period: DatePeriod.day,
+                  onPeriodChanged: (date) {
+                    context.read<DailyReportCubit>().selectDate(date);
+                  },
+                ),
                 const SizedBox(height: 4),
                 const SleepScoreCard(),
                 const SizedBox(height: 16),

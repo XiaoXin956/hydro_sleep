@@ -69,6 +69,7 @@
   "waterLevel": "Water Level",
   "waterLevelNormal": "Normal",
   "waterLevelAbnormal": "Abnormal",
+  "waterLevelUnknown": "Unknown",
   "autoAdjustDuringSleep": "Auto adjust during sleep",
   "searchDevice": "Search Device",
   "availableDevices": "Available Devices",

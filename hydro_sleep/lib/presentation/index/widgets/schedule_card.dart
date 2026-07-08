@@ -12,36 +12,41 @@ class ScheduleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final workTime = context.watch<BleDataCubit>().state.deviceInfo?.workTime;
+    final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
+    final workTime = deviceInfo?.workTime;
+    final poweredOff = deviceInfo?.isPoweredOff ?? false;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              l10n.workTimeTitle,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.access_time, size: 20, color: workTime != null ? AppColors.primary : AppColors.textHint),
-                  const SizedBox(width: 6),
-                  Text(
-                    workTime != null ? l10n.workTimeHours(workTime) : '--',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      color: workTime != null ? AppColors.primary : AppColors.textHint,
-                      fontWeight: FontWeight.bold,
-                    ),
+      child: Opacity(
+        opacity: poweredOff ? 0.5 : 1,
+        child: IgnorePointer(
+          ignoring: poweredOff,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l10n.workTimeTitle, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 16),
+                Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.access_time, size: 20, color: workTime != null ? AppColors.primary : AppColors.textHint),
+                      const SizedBox(width: 6),
+                      Text(
+                        workTime != null ? l10n.workTimeHours(workTime) : '--',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: workTime != null ? AppColors.primary : AppColors.textHint,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

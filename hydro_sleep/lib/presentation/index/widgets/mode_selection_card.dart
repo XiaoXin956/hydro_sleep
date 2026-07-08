@@ -48,7 +48,9 @@ class _ModeSelectionCardState extends State<ModeSelectionCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final workMode = context.watch<BleDataCubit>().state.deviceInfo?.workMode;
+    final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
+    final workMode = deviceInfo?.workMode;
+    final poweredOff = deviceInfo?.isPoweredOff ?? false;
 
     final modes = [
       (0, l10n.modeAuto, Icons.autorenew),
@@ -57,32 +59,38 @@ class _ModeSelectionCardState extends State<ModeSelectionCard> {
     ];
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(l10n.mode, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Row(
+      child: Opacity(
+        opacity: poweredOff ? 0.5 : 1,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: IgnorePointer(
+            ignoring: poweredOff,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final (value, label, icon) in modes) ...[
-                  if (value > 0) const SizedBox(width: 12),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _sending ? null : () => _onSelect(value),
-                      child: _ModeButton(
-                        label: label,
-                        icon: icon,
-                        isSelected: workMode == value,
-                        sending: _sending && workMode == value,
+                Text(l10n.mode, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    for (final (value, label, icon) in modes) ...[
+                      if (value > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _sending ? null : () => _onSelect(value),
+                          child: _ModeButton(
+                            label: label,
+                            icon: icon,
+                            isSelected: workMode == value,
+                            sending: _sending && workMode == value,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
+                    ],
+                  ],
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -159,6 +159,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get waterLevelAbnormal => '异常';
 
   @override
+  String get waterLevelUnknown => '未知';
+
+  @override
   String get autoAdjustDuringSleep => '睡眠期间自动调节';
 
   @override

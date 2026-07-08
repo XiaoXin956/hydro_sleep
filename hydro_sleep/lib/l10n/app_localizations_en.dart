@@ -159,6 +159,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waterLevelAbnormal => 'Abnormal';
 
   @override
+  String get waterLevelUnknown => 'Unknown';
+
+  @override
   String get autoAdjustDuringSleep => 'Auto adjust during sleep';
 
   @override

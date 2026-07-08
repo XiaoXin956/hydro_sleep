@@ -12,42 +12,53 @@ class WaterLevelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final lowWater = context.watch<BleDataCubit>().state.deviceInfo?.lowWater;
-    final isNormal = lowWater == null || lowWater == 0;
+    final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
+    final lowWater = deviceInfo?.lowWater;
+    final poweredOff = deviceInfo?.isPoweredOff ?? false;
+
+    final isUnknown = poweredOff || lowWater == null;
+    final isAbnormal = !isUnknown && lowWater != 0;
+
+    final color = isUnknown
+        ? AppColors.textHint
+        : (isAbnormal ? Colors.orange : AppColors.success);
+    final icon = isUnknown
+        ? Icons.help_outline
+        : (isAbnormal ? Icons.warning_amber_rounded : Icons.water_drop);
+    final label = poweredOff
+        ? l10n.waterLevelUnknown
+        : (lowWater == null
+            ? l10n.waterLevelUnknown
+            : (isAbnormal ? l10n.waterLevelAbnormal : l10n.waterLevelNormal));
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(
-              isNormal ? Icons.water_drop : Icons.warning_amber_rounded,
-              color: isNormal ? AppColors.primary : Colors.orange,
-              size: 22,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                l10n.waterLevel,
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: (isNormal ? AppColors.success : Colors.orange).withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                isNormal ? l10n.waterLevelNormal : l10n.waterLevelAbnormal,
-                style: TextStyle(
-                  color: isNormal ? AppColors.success : Colors.orange,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+      child: Opacity(
+        opacity: poweredOff ? 0.5 : 1,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: IgnorePointer(
+            ignoring: poweredOff,
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(l10n.waterLevel, style: theme.textTheme.titleMedium),
                 ),
-              ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    label,
+                    style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

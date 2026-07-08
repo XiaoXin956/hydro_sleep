@@ -34,7 +34,7 @@ lib/
       bluetooth_service.dart   - BleService: scan/connect/disconnect/connectionState/discoverServices/enableNotify/writeData
       ble_scan_cubit.dart      - BleScanCubit: BLE scan state (scanning/scanResults/error), filtered by platform
       ble_connect_cubit.dart   - BleConnectCubit: BLE connection lifecycle (connect/disconnect/auto-reconnect/断开检测)
-      ble_data_cubit.dart      - BleDataCubit: BLE 数据流管理，按 bytes[1] 分发（0x81/0x82/0x8C/0x97），支持命令发送与响应等待
+      ble_data_cubit.dart      - BleDataCubit: BLE 数据流管理，按 bytes[1] 分发（0x81/0x82/0x8C/0x93/0x94/0x97），支持命令发送与响应等待。0x93：分批收集→ReportSummary 解析（大端序）→Isar 持久化→缓冲清理。0x94：SleepMinuteRecord 解析
   data/
     local/                  - Isar DB + models (build_runner generates .g.dart)
       isar_database.dart    - HydroSleepDatabase singleton
@@ -44,12 +44,12 @@ lib/
   domain/
     enums/sleep_stage.dart  - SleepStage, ReportSleepStage enums
     models/history_device.dart - HistoryDevice (Equatable, JSON serialization)
-    models/device_info.dart    - DeviceInfo（A5 5A 帧头解析：powerStatus[2], workMode[3], workPower[4], workTime[5], targetTemp[6], lowWater[7], actualTemp[8]）
+    models/device_info.dart    - DeviceInfo（A5 5A 帧头解析：powerStatus[2], workMode[3], workPower[4], workTime[5], targetTemp[6], lowWater[7], actualTemp[8]）；`isPoweredOff` getter（powerStatus == 0）
     models/device_status.dart  - DeviceStatus（6字节：模式、错误码、时间戳）
     models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
     models/retransmit30_record.dart - Retransmit30Record（15字节/组：分钟级记录）
-    models/report_summary.dart       - ReportSummary（26字节：startTime/sleepLen/duration/start/end/spo2/avgHR/avgBR）
+    models/report_summary.dart       - ReportSummary（26字节：startTime 4B BE / 其余 uint16 均 BE：totalSleepMinutes/sleepEfficiency/sleepQuality/turnOverCount/sleepLatencyMinutes/leaveBedCount/sleepRhythmPhase/reserved1/longestSleepStartMinute/ahiIndex/snoreTotalCount）
     models/sleep_minute_record.dart  - SleepMinuteRecord（4字节/组：mode, heartRate, breathRate, bodyMove）
   l10n/
     app_en.arb              - English translations (template)
@@ -59,25 +59,22 @@ lib/
     startup/startup_page.dart         - Splash screen (auto-navigate to /home after 2s)
     home/home_page.dart               - Tab shell (BottomNavigationBar, 3 tabs)
     index/index_page.dart             - Home tab content
-    index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard
-    report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly/Yearly)
-    report/widgets/                   - DateHeader, SleepScoreCard, SleepStagesSummary, SleepTempCurve, HeartRateChart,
+    index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard, WaterLevelCard（三态：未知/正常/异常 + 关机灰化）
+    report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly)
+    report/widgets/                   - DateHeader, SleepScoreCard（评分环形+总时长+入睡起床时间+DB查询+动画过渡）, SleepStagesSummary, SleepTempCurve, HeartRateChart,
                                       RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
                                       DeviceStatusTestCard, HeartbeatTestCard, PressureCalibrateTestCard,
                                       ParameterTestCard, ClockCalibrateTestCard,
                                       ReportQueryTestCard, ReportDetailTestCard, FirmwareVersionTestCard
     report/daily/
-      daily_report_content.dart
-      bloc/daily_report_cubit.dart
+      daily_report_content.dart     - BlocProvider<DailyReportCubit>，DateHeader 切换触发 selectDate → Isar DB 查询
+      bloc/daily_report_cubit.dart  - selectDate：按日期范围查询 SleepDataRepository，emit ReportSummary，无数据时 clearReport
     report/weekly/
       weekly_report_content.dart
       bloc/weekly_report_cubit.dart
     report/monthly/
       monthly_report_content.dart
       bloc/monthly_report_cubit.dart
-    report/yearly/
-      yearly_report_content.dart
-      bloc/yearly_report_cubit.dart
     profile/profile_page.dart         - Settings (profile, device list, language, temp unit, mode preference, bed exit, firmware version, factory reset)
     profile/widgets/                  - ProfileCard, DeviceListCard, LanguageSelector, TemperatureUnitSelector, etc.
     device_search/device_search_page.dart - BLE device search & connect dialog (BleScanCubit + BleConnectCubit)
@@ -117,7 +114,7 @@ flutter run
   - `DeviceListCubit` — `DeviceListState` with `List<HistoryDevice>` + expand/collapse, loads from `DeviceRepository`
   - `BleScanCubit` — BLE 扫描状态（scanning/scanResults/error），Android 平台动态权限处理
   - `BleConnectCubit` — BLE 连接生命周期（connecting/connected/disconnecting/disconnected/reconnecting/failed），断开检测（stream + 3s 定时轮询），自动重连（maxRetries=3, autoConnect: true, 20s 超时, 10s 间隔），蓝牙关闭自动清理
-  - `BleDataCubit` — BLE 数据流管理（discovering → subscribing → streaming），按 `bytes[1]` 分发响应类型，支持命令发送+响应等待（`Completer` 模式），连接成功后自动查询固件版本。实时数据存储：0x85 秒数据环形缓冲（120条）、0x86 分钟数据环形缓冲（30条）
+  - `BleDataCubit` — BLE 数据流管理（discovering → subscribing → streaming），按 `bytes[1]` 分发响应类型，支持命令发送+响应等待（`Completer` 模式），连接成功后自动查询固件版本。实时数据存储：0x85 秒数据环形缓冲（120条）、0x86 分钟数据环形缓冲（30条）。0x93 分批收集完成后 Isar 持久化并清理缓冲
 - **Internationalization**: ARB-based (`flutter gen-l10n`). English is default. Language persisted via `SecureStorageService.saveLanguage()`. `LocaleCubit` loads saved locale on startup. Use `AppLocalizations.of(context)!` to access translations.
 - **Data layer**: Two singletons - `HydroSleepDatabase` (Isar) and `SecureStorageService` (flutter_secure_storage). Repositories wrap these.
 - **Routing**: GoRouter with `StatefulShellRoute.indexedStack` for 3-tab home (Home/Report/Profile). Startup -> /home auto-navigates after 2s.
@@ -140,9 +137,15 @@ flutter run
   - 校准时钟（0x0B）→ 0x8B：无内容，发送4字节Unix时间戳LE
   - 固件版本（0x0C）→ 0x8C：版本字符串（如 `UiSleep_Pro_BLE_HVER810_FVER180`）
   - 恢复出厂（0x17）→ 0x97：无内容
-  - 报表查询（0x13）→ 0x93：15组×26字节 ReportSummary（分3批，每批5组），`sendReportQueryCommand()`
+  - 报表查询（0x13）→ 0x93：`[帧头2B(7D 93)][长度1B][序号1B(=bytes[3])][UNCONFIGED 10B][记录N×26B][0D仅末尾批]`，记录从 `bytes[14]` 开始，`contentLen ~/ 26` 组，`sendReportQueryCommand()`
   - 数据读取（0x14）→ 0x94：startTime + seq(0~47)，返回30分钟×4字节 SleepMinuteRecord，`sendSleepDataReadCommand(startTime, seq)`
+  - **ReportSummary 字节序**：timestamp 4B 大端序，其余 uint16 字段均大端序（`_u16BE`）
+  - **缓冲清理**：0x93 批次完成后清理 `_reportBuffer`、`_reportBatchReceived`、`_lastReportAsciiId`
   - 设备控制：`sendDeviceControlCommand(power/mode/workPower/workTime/targetTemp/lowWater)` 读取当前 `DeviceInfo` 状态，覆盖指定字段后发送 11 字节 `[A5 5A ...]` 帧
   - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析（workMode: 0=自动, 1=制冷, 2=制热）
   - 详细协议文档见 `BLE_PROTOCOL.md`
 - **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除
+- **设备关机 UI 模式**：`deviceInfo.isPoweredOff`（`powerStatus == 0`）时，首页模式/水位/温度/工作时间卡片使用 `Opacity(0.5)` + `IgnorePointer(ignoring: true)` 灰化禁用
+- **水位卡片三态**：poweredOff 或 null → "未知"（灰色），`waterLevel == 0` → "正常"（绿色），其他 → "异常"（橙色）
+- **日报告 DB 查询**：`DailyReportCubit.selectDate(date)` 查询 Isar 的 `SleepDataRepository.getReportsByDeviceAndDateRange()`，按日期范围检索 `ReportSummary`，切换日期不立即清空（动画连续性）
+- **SleepScoreCard 入睡/起床时间**：`startTime`（入睡），`startTime + totalSleepMinutes`（起床），格式 `HH:MM → HH:MM`，TweenAnimationBuilder 350ms easeOutCubic 动画过渡

@@ -386,6 +386,12 @@ abstract class AppLocalizations {
   /// **'Abnormal'**
   String get waterLevelAbnormal;
 
+  /// No description provided for @waterLevelUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get waterLevelUnknown;
+
   /// No description provided for @autoAdjustDuringSleep.
   ///
   /// In en, this message translates to:

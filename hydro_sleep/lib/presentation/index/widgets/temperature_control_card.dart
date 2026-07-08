@@ -67,16 +67,21 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
     final l10n = AppLocalizations.of(context)!;
     final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
     final currentTemp = deviceInfo?.actualTemp;
+    final poweredOff = deviceInfo?.isPoweredOff ?? false;
 
     // 从设备同步目标温度
-    if (deviceInfo != null) {
+    if (deviceInfo != null && !poweredOff) {
       _syncFromDevice(deviceInfo.targetTemp);
     }
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      child: Opacity(
+        opacity: poweredOff ? 0.5 : 1,
+        child: IgnorePointer(
+          ignoring: poweredOff,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(l10n.temperature, style: theme.textTheme.titleMedium),
@@ -142,9 +147,11 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
             const SizedBox(height: 4),
             _presetGrid(theme),
           ],
-        ),
-      ),
-    );
+        ), // Column
+      ),   // Padding
+        ),   // IgnorePointer
+      ),     // Opacity
+    );       // Card
   }
 
   Widget _presetGrid(ThemeData theme) {

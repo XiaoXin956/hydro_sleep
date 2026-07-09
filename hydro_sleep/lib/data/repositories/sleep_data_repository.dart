@@ -1,7 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:isar_community/isar.dart';
 import 'package:hydro_sleep/data/local/isar_database.dart';
 import 'package:hydro_sleep/data/local/models/report_summary_record.dart';
+import 'package:hydro_sleep/data/local/models/sleep_minute_data.dart';
+import 'package:hydro_sleep/data/local/models/temperature_record.dart';
 import 'package:hydro_sleep/domain/models/report_summary.dart';
+import 'package:hydro_sleep/domain/enums/sleep_minute_status.dart';
 
 /// 睡眠数据仓储
 class SleepDataRepository {
@@ -103,6 +107,138 @@ class SleepDataRepository {
     final db = await HydroSleepDatabase.getInstance();
     final count = await db.reportSummaryRecords.count();
     await db.writeTxn(() => db.reportSummaryRecords.clear());
+    return count;
+  }
+
+  // ── 0x94 分钟级睡眠数据 ──
+
+  /// 保存分钟级睡眠数据（按 deviceId+timestamp 去重覆盖）
+  static Future<void> saveSleepMinuteData({
+    required String deviceId,
+    required DateTime startTime,
+    required List<({int statusByte, int heartRate, int breathRate, int bodyMove})> groups,
+  }) async {
+    final db = await HydroSleepDatabase.getInstance();
+    final records = <SleepMinuteData>[];
+
+    for (var i = 0; i < groups.length; i++) {
+      final g = groups[i];
+      final ts = startTime.add(Duration(minutes: i));
+      // 去掉秒，只保留分钟精度
+      final minuteTs = DateTime(ts.year, ts.month, ts.day, ts.hour, ts.minute);
+
+      final record = SleepMinuteData()
+        ..deviceId = deviceId
+        ..timestamp = minuteTs
+        ..status = SleepMinuteStatus.fromByte(g.statusByte).dbValue
+        ..heartRate = g.heartRate
+        ..breathRate = g.breathRate
+        ..bodyMove = g.bodyMove;
+
+      // 查找已有记录覆盖
+      final existing = await db.sleepMinuteDatas
+          .filter()
+          .deviceIdEqualTo(deviceId)
+          .timestampEqualTo(minuteTs)
+          .findFirst();
+      if (existing != null) {
+        record.id = existing.id;
+      }
+
+      records.add(record);
+    }
+
+    await db.writeTxn(() => db.sleepMinuteDatas.putAll(records));
+    debugPrint('[数据管理] 0x94 已保存 ${records.length} 分钟数据到 DB, '
+        'deviceId=$deviceId, 首条时间=${records.isNotEmpty ? records.first.timestamp : "无"}');
+  }
+
+  /// 按日期查询分钟级数据（睡眠日：前一天 18:00 ~ 当天 18:00）
+  static Future<List<SleepMinuteData>> getSleepMinuteDataByDate({
+    required String deviceId,
+    required DateTime date,
+  }) async {
+    final db = await HydroSleepDatabase.getInstance();
+    // 睡眠日边界 18:00：用户选 7/9 → 查 7/8 18:00 ~ 7/9 18:00
+    final dayBase = DateTime(date.year, date.month, date.day);
+    final sleepDayStart = dayBase.subtract(const Duration(hours: 6)); // 前一天 18:00
+    final sleepDayEnd = dayBase.add(const Duration(hours: 18));      // 当天 18:00
+    debugPrint('[数据管理] 查询分钟数据: deviceId=$deviceId, '
+        'sleepDay=$sleepDayStart ~ $sleepDayEnd');
+    final result = await db.sleepMinuteDatas
+        .filter()
+        .deviceIdEqualTo(deviceId)
+        .timestampBetween(sleepDayStart, sleepDayEnd)
+        .sortByTimestamp()
+        .findAll();
+    debugPrint('[数据管理] 查询结果: ${result.length} 条');
+    return result;
+  }
+
+  /// 查询所有分钟数据（调试用，不过滤 deviceId）
+  static Future<List<SleepMinuteData>> getAllSleepMinuteData() async {
+    final db = await HydroSleepDatabase.getInstance();
+    final all = await db.sleepMinuteDatas.where().findAll();
+    debugPrint('[数据管理] 全部分钟数据: ${all.length} 条');
+    for (final r in all.take(5)) {
+      debugPrint('[数据管理]   deviceId=${r.deviceId}, ts=${r.timestamp}, '
+          'status=${r.status}, hr=${r.heartRate}');
+    }
+    return all;
+  }
+
+  /// 清空所有分钟级睡眠数据
+  static Future<int> deleteAllSleepMinuteData() async {
+    final db = await HydroSleepDatabase.getInstance();
+    final count = await db.sleepMinuteDatas.count();
+    await db.writeTxn(() => db.sleepMinuteDatas.clear());
+    return count;
+  }
+
+  // ── 温度记录（A5 5A 实际温度）──
+
+  /// 保存单条温度记录
+  static Future<void> saveTemperatureRecord({
+    required String deviceId,
+    required DateTime timestamp,
+    required int temperature,
+  }) async {
+    final db = await HydroSleepDatabase.getInstance();
+    final record = TemperatureRecord()
+      ..deviceId = deviceId
+      ..timestamp = timestamp
+      ..temperature = temperature;
+    await db.writeTxn(() => db.temperatureRecords.put(record));
+  }
+
+  /// 按日期查询温度记录（睡眠日：前一天 18:00 ~ 当天 18:00）
+  static Future<List<TemperatureRecord>> getTemperatureByDate({
+    required String deviceId,
+    required DateTime date,
+  }) async {
+    final db = await HydroSleepDatabase.getInstance();
+    final dayBase = DateTime(date.year, date.month, date.day);
+    final sleepDayStart = dayBase.subtract(const Duration(hours: 6));
+    final sleepDayEnd = dayBase.add(const Duration(hours: 18));
+    return db.temperatureRecords
+        .filter()
+        .deviceIdEqualTo(deviceId)
+        .timestampBetween(sleepDayStart, sleepDayEnd)
+        .sortByTimestamp()
+        .findAll();
+  }
+
+  /// 查询所有温度记录（调试用）
+  static Future<List<TemperatureRecord>> getAllTemperatureRecords() async {
+    final db = await HydroSleepDatabase.getInstance();
+    return db.temperatureRecords.where().findAll();
+  }
+
+  /// 清空所有温度记录
+  static Future<int> deleteAllTemperatureRecords() async {
+    final db = await HydroSleepDatabase.getInstance();
+    final count = await db.temperatureRecords.count();
+    await db.writeTxn(() => db.temperatureRecords.clear());
     return count;
   }
 }

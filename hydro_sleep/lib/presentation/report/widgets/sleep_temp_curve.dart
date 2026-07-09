@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/core/utils/mock_data.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
+import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 
-/// 睡眠 & 温度曲线卡片（双 Y 轴，共用 0-35 范围）
+/// 睡眠 & 温度曲线卡片（双 Y 轴，0-50 范围）
 class SleepTempCurve extends StatelessWidget {
   const SleepTempCurve({super.key});
 
-  static const double _yMin = 0;
-  static const double _yMax = 35;
+  // 睡眠阶段 → Y 值映射
+  static const double _deepSleep = 10;
+  static const double _lightSleep = 20;
+  static const double _rem = 30;
+  static const double _awake = 40;
 
-  static const double _deepSleep = 4;
-  static const double _lightSleep = 10;
-  static const double _rem = 16;
-  static const double _eyeMove = 24;
-  static const double _awake = 30;
+  static const double _yMin = 0;
+  static const double _yMax = 50;
 
   static final _stageKeys = <double, String>{
     _deepSleep: 'deep',
     _lightSleep: 'light',
     _rem: 'rem',
-    _eyeMove: 'eyeMove',
     _awake: 'awake',
   };
 
@@ -33,8 +34,6 @@ class SleepTempCurve extends StatelessWidget {
         return l10n.sleepStageLight;
       case 'rem':
         return l10n.sleepStageRem;
-      case 'eyeMove':
-        return l10n.sleepStageEyeMove;
       case 'awake':
         return l10n.sleepStageAwake;
       default:
@@ -58,16 +57,37 @@ class SleepTempCurve extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-            SizedBox(
-              height: 200,
-              child: LineChart(
-                _chartData(
-                  sleepStages: MockData.sleepStagesCurve,
-                  temperatureData: MockData.temperatureCurve,
-                  l10n: l10n,
-                ),
-                duration: const Duration(milliseconds: 250),
-              ),
+            BlocBuilder<DailyReportCubit, DailyReportState>(
+              builder: (context, state) {
+                // 优先用真实数据，无数据时用 mock
+                final List<double> stageData;
+                final DateTime startTime;
+                if (state.stageCurve.isNotEmpty) {
+                  stageData = state.stageCurve;
+                  startTime = state.curveStartTime!;
+                } else {
+                  stageData = MockData.sleepStagesCurve;
+                  // mock 默认 23:00
+                  final now = DateTime.now();
+                  startTime = DateTime(now.year, now.month, now.day, 23, 0);
+                }
+                final tempData = state.temperatureCurve.isNotEmpty
+                    ? state.temperatureCurve
+                    : MockData.temperatureCurve;
+
+                return SizedBox(
+                  height: 200,
+                  child: LineChart(
+                    _buildChart(
+                      sleepStages: stageData,
+                      temperatureData: tempData,
+                      startTime: startTime,
+                      l10n: l10n,
+                    ),
+                    duration: const Duration(milliseconds: 250),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 12),
             Row(
@@ -89,12 +109,8 @@ class SleepTempCurve extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          width: 12, height: 12,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(label, style: theme.textTheme.bodySmall),
@@ -102,34 +118,36 @@ class SleepTempCurve extends StatelessWidget {
     );
   }
 
-  LineChartData _chartData({
+  LineChartData _buildChart({
     required List<double> sleepStages,
     required List<double> temperatureData,
+    required DateTime startTime,
     required AppLocalizations l10n,
   }) {
     final sleepSpots = List.generate(
       sleepStages.length,
       (i) => FlSpot(i.toDouble(), sleepStages[i]),
     );
-    final tempSpots = List.generate(
-      temperatureData.length,
-      (i) => FlSpot(i.toDouble(), temperatureData[i]),
-    );
+    final tempSpots = <FlSpot>[];
+    for (var i = 0; i < temperatureData.length; i++) {
+      if (temperatureData[i] > 0) {
+        tempSpots.add(FlSpot(i.toDouble(), temperatureData[i]));
+      }
+    }
 
+    // X 轴标签：基于实际 startTime，每分钟一个点
     String xLabel(int index) {
-      final totalMin = 23 * 60 + index * 5;
-      final h = (totalMin ~/ 60) % 24;
-      final m = totalMin % 60;
-      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      final t = startTime.add(Duration(minutes: index));
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     }
 
     return LineChartData(
       gridData: FlGridData(
         show: true,
         drawVerticalLine: false,
-        horizontalInterval: 5,
-        getDrawingHorizontalLine: (value) => FlLine(
-          color: const Color(0xFFE0E0E0),
+        horizontalInterval: 10,
+        getDrawingHorizontalLine: (value) => const FlLine(
+          color: Color(0xFFE0E0E0),
           strokeWidth: 0.5,
         ),
       ),
@@ -137,8 +155,8 @@ class SleepTempCurve extends StatelessWidget {
         leftTitles: AxisTitles(
           sideTitles: SideTitles(
             showTitles: true,
-            reservedSize: 36,
-            interval: 1,
+            reservedSize: 40,
+            interval: 10,
             getTitlesWidget: (value, meta) {
               if (_stageKeys.containsKey(value)) {
                 return Padding(
@@ -157,7 +175,7 @@ class SleepTempCurve extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 30,
-            interval: 5,
+            interval: 10,
             getTitlesWidget: (value, meta) {
               return Padding(
                 padding: const EdgeInsets.only(left: 4),
@@ -173,16 +191,13 @@ class SleepTempCurve extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 24,
-            interval: 12,
+            interval: 60, // 每小时一个标签
             getTitlesWidget: (value, meta) {
               final idx = value.toInt();
-              if (idx >= 0 && idx < sleepStages.length && idx % 12 == 0) {
+              if (idx >= 0 && idx < sleepStages.length && idx % 60 == 0) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    xLabel(idx),
-                    style: const TextStyle(fontSize: 10),
-                  ),
+                  child: Text(xLabel(idx), style: const TextStyle(fontSize: 10)),
                 );
               }
               return const SizedBox.shrink();
@@ -216,6 +231,37 @@ class SleepTempCurve extends StatelessWidget {
       maxX: (sleepStages.length - 1).toDouble(),
       minY: _yMin,
       maxY: _yMax,
+      lineTouchData: LineTouchData(
+        touchTooltipData: LineTouchTooltipData(
+          getTooltipColor: (_) => Colors.white,
+          getTooltipItems: (spots) => spots.map((spot) {
+            final isTemp = spot.barIndex == 1;
+            final text = isTemp
+                ? '${spot.y.toInt()}°C'
+                : '${spot.y.toInt()}';
+            return LineTooltipItem(
+              text,
+              TextStyle(
+                color: isTemp ? AppColors.temperatureCurve : AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            );
+          }).toList(),
+        ),
+        getTouchedSpotIndicator: (barData, spotIndexes) => spotIndexes.map((_) =>
+          TouchedSpotIndicatorData(
+            FlLine(color: barData.color ?? AppColors.primary, strokeWidth: 1),
+            FlDotData(
+              show: true,
+              getDotPainter: (_, __, ___, ____) => FlDotCirclePainter(
+                radius: 4, color: barData.color ?? AppColors.primary,
+                strokeWidth: 2, strokeColor: Colors.white,
+              ),
+            ),
+          ),
+        ).toList(),
+      ),
     );
   }
 }

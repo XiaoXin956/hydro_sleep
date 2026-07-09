@@ -34,15 +34,16 @@ lib/
       bluetooth_service.dart   - BleService: scan/connect/disconnect/connectionState/discoverServices/enableNotify/writeData
       ble_scan_cubit.dart      - BleScanCubit: BLE scan state (scanning/scanResults/error), filtered by platform
       ble_connect_cubit.dart   - BleConnectCubit: BLE connection lifecycle (connect/disconnect/auto-reconnect/断开检测)
-      ble_data_cubit.dart      - BleDataCubit: BLE 数据流管理，按 bytes[1] 分发（0x81/0x82/0x8C/0x93/0x94/0x97），支持命令发送与响应等待。0x93：分批收集→ReportSummary 解析（大端序）→Isar 持久化→缓冲清理。0x94：SleepMinuteRecord 解析
+      ble_data_cubit.dart      - BleDataCubit: BLE 数据流管理，按 bytes[1] 分发（0x81/0x82/0x8C/0x93/0x94/0x97），支持命令发送与响应等待。0x93：分批收集→ReportSummary 解析（大端序）→Isar 持久化→缓冲清理。0x94：SleepMinuteRecord 解析。A5 5A：每10秒存储 actualTemp 到 TemperatureRecord
   data/
     local/                  - Isar DB + models (build_runner generates .g.dart)
       isar_database.dart    - HydroSleepDatabase singleton
-      models/               - SleepSession, SleepReport, SleepMinute (@collection)
+      models/               - SleepSession, SleepReport, SleepMinute, SleepMinuteData, TemperatureRecord (@collection)
     repositories/           - Business logic layer (device_repository, sleep_data_repository)
     storage/                - SecureStorageService singleton (flutter_secure_storage)
   domain/
     enums/sleep_stage.dart  - SleepStage, ReportSleepStage enums
+    enums/sleep_minute_status.dart - SleepMinuteStatus enum (deepSleep/lightSleep/rem/awake/outOfBed/sitting)
     models/history_device.dart - HistoryDevice (Equatable, JSON serialization)
     models/device_info.dart    - DeviceInfo（A5 5A 帧头解析：powerStatus[2], workMode[3], workPower[4], workTime[5], targetTemp[6], lowWater[7], actualTemp[8]）；`isPoweredOff` getter（powerStatus == 0）
     models/device_status.dart  - DeviceStatus（6字节：模式、错误码、时间戳）
@@ -61,14 +62,15 @@ lib/
     index/index_page.dart             - Home tab content
     index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard, WaterLevelCard（三态：未知/正常/异常 + 关机灰化）
     report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly)
-    report/widgets/                   - DateHeader, SleepScoreCard（评分环形+总时长+入睡起床时间+DB查询+动画过渡）, SleepStagesSummary, SleepTempCurve, HeartRateChart,
+    report/widgets/                   - DateHeader, SleepScoreCard（评分环形+总时长+入睡起床时间+DB查询+动画过渡）, SleepStagesSummary（深睡/浅睡/REM/清醒百分比+时长，TweenAnimationBuilder 350ms，无数据显示"-"）, SleepTempCurve（Y轴0-50，左侧睡眠阶段=10/20/30/40，右侧温度°C，双线+整数tooltip）, HeartRateChart（max/min/avg，Y轴20-220，6标签）,
                                       RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
                                       DeviceStatusTestCard, HeartbeatTestCard, PressureCalibrateTestCard,
                                       ParameterTestCard, ClockCalibrateTestCard,
-                                      ReportQueryTestCard, ReportDetailTestCard, FirmwareVersionTestCard
+                                      ReportQueryTestCard, ReportDetailTestCard, FirmwareVersionTestCard,
+                                      SleepMinuteDataTestCard（0x94分钟数据：查看/全部/生成5天测试/清空）, TemperatureRecordTestCard（A5 5A温度：查看/全部/生成5天测试/清空，23:00→06:00每5秒）
     report/daily/
-      daily_report_content.dart     - BlocProvider<DailyReportCubit>，DateHeader 切换触发 selectDate → Isar DB 查询
-      bloc/daily_report_cubit.dart  - selectDate：按日期范围查询 SleepDataRepository，emit ReportSummary，无数据时 clearReport
+      daily_report_content.dart     - BlocProvider<DailyReportCubit>，DateHeader 切换触发 selectDate → Isar DB 查询（报告+分钟数据+温度数据）
+      bloc/daily_report_cubit.dart  - selectDate：查询 ReportSummary + SleepMinuteData（18:00睡眠日边界）+ TemperatureRecord，计算 stageStats（深睡/浅睡/REM/清醒 分钟数+占比），生成 stageCurve/heartRateCurve/temperatureCurve，温度按分钟桶降采样
     report/weekly/
       weekly_report_content.dart
       bloc/weekly_report_cubit.dart
@@ -148,4 +150,9 @@ flutter run
 - **设备关机 UI 模式**：`deviceInfo.isPoweredOff`（`powerStatus == 0`）时，首页模式/水位/温度/工作时间卡片使用 `Opacity(0.5)` + `IgnorePointer(ignoring: true)` 灰化禁用
 - **水位卡片三态**：poweredOff 或 null → "未知"（灰色），`waterLevel == 0` → "正常"（绿色），其他 → "异常"（橙色）
 - **日报告 DB 查询**：`DailyReportCubit.selectDate(date)` 查询 Isar 的 `SleepDataRepository.getReportsByDeviceAndDateRange()`，按日期范围检索 `ReportSummary`，切换日期不立即清空（动画连续性）
+- **睡眠日边界（18:00 规则）**：`SleepDataRepository.getSleepMinuteDataByDate()` 和 `getTemperatureByDate()` 使用 18:00 分界——`dayBase.subtract(Duration(hours: 6))`（前一天18:00）到 `dayBase.add(Duration(hours: 18))`（当天18:00），选择"7月9日"查询 7/8 18:00 → 7/9 18:00 的数据
+- **SleepMinuteStatus 枚举**：0=深睡, 1=浅睡, 2=REM, 3=清醒, 4=离床, 5=坐起。统计时清醒/离床/坐起合并为"清醒"
+- **温度降采样**：TemperatureRecord 按分钟桶（`ms ~/ 60000`）取平均值，与 SleepMinuteData 逐分钟对齐，无数据点填 0（图表跳过 0 值）
+- **温度存储**：A5 5A 帧 `bytes[8]` = actualTemp，BLE 回调中 10秒节流写入 Isar（`unawaited()` fire-and-forget）
 - **SleepScoreCard 入睡/起床时间**：`startTime`（入睡），`startTime + totalSleepMinutes`（起床），格式 `HH:MM → HH:MM`，TweenAnimationBuilder 350ms easeOutCubic 动画过渡
+- **fl_chart integer tooltip**：`spot.y.toInt()` 格式化，避免浮点数长小数

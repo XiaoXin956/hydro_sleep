@@ -20,6 +20,8 @@ import 'package:hydro_sleep/presentation/report/widgets/report_query_test_card.d
 import 'package:hydro_sleep/presentation/report/widgets/report_detail_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/firmware_version_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/report_storage_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/sleep_minute_data_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/temperature_record_test_card.dart';
 
 /// 日报告内容
 class DailyReportContent extends StatelessWidget {
@@ -88,10 +90,14 @@ class _DailyReportBody extends StatelessWidget {
                 const FirmwareVersionTestCard(),
                 const SizedBox(height: 16),
                 const ReportStorageTestCard(),
+                const SizedBox(height: 16),
+                const SleepMinuteDataTestCard(),
+                const SizedBox(height: 16),
+                const TemperatureRecordTestCard(),
                 const SizedBox(height: 40),
               ];
               return items[index];
-            }, childCount: 36),
+            }, childCount: 40),
           ),
         ),
       ],

@@ -149,6 +149,10 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   // 存储数据读取相关（0x14/0x94）
   Completer<List<SleepMinuteRecord>>? _sleepDataCompleter;
+  List<int> _sleepDataBuffer = [];
+
+  // 温度存储节流（每 10 秒存一条）
+  DateTime _lastTempSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   static const _deviceInfoLength = 11;
   static const _headerDeviceByte1 = 0xA5;
@@ -288,6 +292,7 @@ class BleDataCubit extends Cubit<BleDataState> {
         _sleepDataCompleter!.complete([]);
       }
       _sleepDataCompleter = null;
+      _sleepDataBuffer = [];
       _bleService.clearCharacteristicCache();
       if (state.status != BleDataStatus.idle) {
         debugPrint('[数据管理] 蓝牙已关闭，清理所有数据');
@@ -785,6 +790,20 @@ class BleDataCubit extends Cubit<BleDataState> {
       final info = DeviceInfo.fromBytes(bytes);
       debugPrint('[数据管理] 设备信息: $info');
       emit(state.copyWith(deviceInfo: info, lastReceived: bytes, rawLog: log));
+
+      // 每 10 秒存储一次实际温度
+      final now = DateTime.now();
+      if (now.difference(_lastTempSaveTime).inSeconds >= 10) {
+        _lastTempSaveTime = now;
+        final deviceId = _connectCubit.state.remoteId;
+        if (deviceId != null) {
+          unawaited(SleepDataRepository.saveTemperatureRecord(
+            deviceId: deviceId,
+            timestamp: now,
+            temperature: info.actualTemp,
+          ));
+        }
+      }
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x81) {
       // 0x81：重传响应（120秒），命令 0x01 触发，30组×12字节
       if (_awaitingRetransmit) {
@@ -1045,38 +1064,100 @@ class BleDataCubit extends Cubit<BleDataState> {
         emit(state.copyWith(lastReceived: bytes, rawLog: log));
       }
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x94) {
-      // 0x94：设备存储数据读取响应，命令 0x14 触发
-      // 帧结构：7D 94 [长度2B LE] [UNCONFIGED 10B] [4B开始时间] [1B序号] [120B数据] 0D
-      // 错误帧：[4B开始时间] [1B=0xFF]
-      if (bytes.length >= 20) {
-        final seq = bytes[18];
-        if (seq == 0xFF) {
-          debugPrint('[数据管理] 0x94 读取错误: 时间或序号无效');
-          emit(state.copyWith(lastReceived: bytes, rawLog: log));
-          if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
-            _sleepDataCompleter!.complete([]);
-          }
-        } else if (bytes.length >= 140) {
-          // 解析 30 分钟 × 4 字节（bytes[19] 开始）
-          final records = <SleepMinuteRecord>[];
-          for (var i = 0; i < 30; i++) {
-            records.add(SleepMinuteRecord.fromBytes(bytes, 19 + i * 4));
-          }
-          debugPrint('[数据管理] 0x94 存储数据: seq=$seq, ${records.length} 分钟');
-          emit(state.copyWith(lastReceived: bytes, rawLog: log));
-          if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
-            _sleepDataCompleter!.complete(records);
-          }
-        } else {
-          debugPrint('[数据管理] 0x94 数据不足: ${bytes.length}字节');
-          emit(state.copyWith(lastReceived: bytes, rawLog: log));
-          if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
-            _sleepDataCompleter!.complete([]);
-          }
+      // 0x94：分钟级睡眠数据，自动推送或 0x14 手动触发
+      // 帧结构：[7D 94][长度2B][ID 10B][开始时间4B BE][序号1B][数据N×4B][0D仅末尾]
+      // bytes[0]=7D, [1]=94, [2..3]=长度, [4..13]=ID, [14..17]=时间BE,
+      // [18]=序号, [19..N-2]=数据, [N-1]=0D
+      // 缓冲直到末尾为 0x0D
+      _sleepDataBuffer.addAll(bytes);
+      debugPrint('[数据管理] 0x94 累积 ${_sleepDataBuffer.length} 字节');
+
+      if (_sleepDataBuffer.last != 0x0D) {
+        // 数据未接收完，继续缓冲
+        return;
+      }
+
+      // 数据接收完成，开始解析
+      final buf = List<int>.from(_sleepDataBuffer);
+      _sleepDataBuffer = [];
+
+      if (buf.length < 20) {
+        debugPrint('[数据管理] 0x94 数据过短: ${buf.length}字节');
+        if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+          _sleepDataCompleter!.complete([]);
         }
-      } else {
-        debugPrint('[数据管理] 0x94 响应过短: ${bytes.length}字节');
-        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+        return;
+      }
+
+      // 帧长度 bytes[2..3]（2字节，小端序）
+      final frameLen = buf[2] | (buf[3] << 8);
+      // ID bytes[4..13]（10字节 ASCII）
+      final asciiId = String.fromCharCodes(buf.sublist(4, 14));
+      // 开始时间 bytes[14..17] 大端序
+      final timeRaw = (buf[14] << 24) | (buf[15] << 16) | (buf[16] << 8) | buf[17];
+      // 序列号 bytes[18]
+      final seq = buf[18];
+
+      debugPrint('[数据管理] 0x94 帧长度=$frameLen, ID=$asciiId');
+
+      if (seq == 0xFF) {
+        debugPrint('[数据管理] 0x94 读取错误（序号0xFF）: 时间或序号无效');
+        if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+          _sleepDataCompleter!.complete([]);
+        }
+        return;
+      }
+
+      final startTime = DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000);
+      debugPrint('[数据管理] 0x94 起始时间=$startTime, 序号=$seq');
+
+      // 数据组从 bytes[19] 到 bytes[N-2]（去掉末尾 0x0D）
+      final dataStart = 19;
+      final dataEnd = buf.length - 1; // 0x0D 之前
+      final dataLen = dataEnd - dataStart;
+      final groupCount = dataLen ~/ 4;
+
+      if (groupCount <= 0) {
+        debugPrint('[数据管理] 0x94 无有效数据组');
+        if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+          _sleepDataCompleter!.complete([]);
+        }
+        return;
+      }
+
+      final records = <SleepMinuteRecord>[];
+      final dbGroups = <({int statusByte, int heartRate, int breathRate, int bodyMove})>[];
+      for (var i = 0; i < groupCount; i++) {
+        final offset = dataStart + i * 4;
+        final record = SleepMinuteRecord.fromBytes(buf, offset);
+        records.add(record);
+        dbGroups.add((
+          statusByte: record.status,
+          heartRate: record.heartRate,
+          breathRate: record.breathRate,
+          bodyMove: record.bodyMovement,
+        ));
+      }
+
+      debugPrint('[数据管理] 0x94 解析完成: $groupCount 分钟, '
+          '首条状态=${records.first.statusName}, '
+          '末条状态=${records.last.statusName}');
+
+      emit(state.copyWith(lastReceived: bytes, rawLog: log));
+
+      // 存入 DB
+      final deviceId = _connectCubit.state.remoteId;
+      debugPrint('[数据管理] 0x94 准备存DB: deviceId=$deviceId, startTime=$startTime');
+      if (deviceId != null) {
+        unawaited(SleepDataRepository.saveSleepMinuteData(
+          deviceId: deviceId,
+          startTime: startTime,
+          groups: dbGroups,
+        ));
+      }
+
+      if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
+        _sleepDataCompleter!.complete(records);
       }
     } else {
       // 未知数据类型：未匹配到已知帧头
@@ -1136,6 +1217,7 @@ class BleDataCubit extends Cubit<BleDataState> {
       _sleepDataCompleter!.complete([]);
     }
     _sleepDataCompleter = null;
+    _sleepDataBuffer = [];
     _bleService.disableNotify();
     _bleService.clearCharacteristicCache();
     emit(const BleDataState());

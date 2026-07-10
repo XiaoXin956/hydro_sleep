@@ -122,6 +122,18 @@ class _DeviceStatusTestCardState extends State<DeviceStatusTestCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (s.deviceId.isNotEmpty) ...[
+          Row(
+            children: [
+              const Text('设备ID: ', style: TextStyle(fontSize: 13)),
+              Text(
+                s.deviceId,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: Colors.blueGrey),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+        ],
         Row(
           children: [
             const Text('模式: ', style: TextStyle(fontSize: 13)),

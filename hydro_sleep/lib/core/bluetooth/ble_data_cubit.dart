@@ -32,6 +32,7 @@ class BleDataState extends Equatable {
   final String? error;
   final DeviceInfo? deviceInfo;
   final String? firmwareVersion;
+  final String? deviceId; // 0x87 响应中返回的设备 ID（bytes[4..13]）
   final List<int>? lastReceived;
   final List<String> rawLog;
 
@@ -49,6 +50,7 @@ class BleDataState extends Equatable {
     this.error,
     this.deviceInfo,
     this.firmwareVersion,
+    this.deviceId,
     this.lastReceived,
     this.rawLog = const [],
     this.latestSecondRecord,
@@ -62,6 +64,7 @@ class BleDataState extends Equatable {
     String? error,
     DeviceInfo? deviceInfo,
     String? firmwareVersion,
+    String? deviceId,
     List<int>? lastReceived,
     List<String>? rawLog,
     RetransmitRecord? latestSecondRecord,
@@ -74,6 +77,7 @@ class BleDataState extends Equatable {
       error: error,
       deviceInfo: deviceInfo ?? this.deviceInfo,
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
+      deviceId: deviceId ?? this.deviceId,
       lastReceived: lastReceived ?? this.lastReceived,
       rawLog: rawLog ?? this.rawLog,
       latestSecondRecord: latestSecondRecord ?? this.latestSecondRecord,
@@ -89,6 +93,7 @@ class BleDataState extends Equatable {
         error,
         deviceInfo,
         firmwareVersion,
+        deviceId,
         lastReceived,
         rawLog,
         latestSecondRecord,
@@ -194,11 +199,18 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const modeMonitor = 0x20;
   static const modeDebug = 0x30;
 
-  /// 查询设备状态 0x07，等待 0x87 响应（模式+错误+时间）
-  static const _deviceStatusCommand = [
-    0x7D, 0x07, 0x0F, 0x00,
-    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
-  ];
+  /// 构建带真实 MAC 的 0x07 命令帧
+  /// remoteId 格式 "98:DA:10:06:95:C0" → [98 DA 10 06 95 C0]
+  /// ID 10 字节，前面补 00: 00 00 00 00 98 DA 10 06 95 C0
+  List<int> _buildDeviceStatusCommand(String remoteId) {
+    final macParts = remoteId.split(':').map((s) => int.parse(s, radix: 16)).toList();
+    final idBytes = [0x00, 0x00, 0x00, 0x00, ...macParts]; // 4+6=10 bytes
+    return [
+      0x7D, 0x07, 0x0F, 0x00,
+      ...idBytes,
+      0x0D,
+    ];
+  }
 
   /// 心跳应答 0x08，每分钟发送一次，超 5 分钟未收到设备将重启 WiFi
   static const heartbeatCommand = [
@@ -353,6 +365,8 @@ class BleDataCubit extends Cubit<BleDataState> {
 
       // 连接成功后自动查询固件版本
       sendFirmwareVersionCommand();
+      // 连接成功后自动查询设备状态（带 MAC 的 0x07）
+      sendDeviceStatusCommand();
     } catch (e) {
       debugPrint('[数据管理] 启动数据流失败: $e');
       emit(state.copyWith(status: BleDataStatus.error, error: '$e'));
@@ -448,7 +462,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   }
 
   /// 查询设备状态 0x07，等待 0x87 响应
-  /// 返回 DeviceStatus（模式+错误+设备时间），null 表示超时或异常
+  /// 返回 DeviceStatus（deviceId + 模式 + 错误 + 设备时间），null 表示超时或异常
   Future<DeviceStatus?> sendDeviceStatusCommand({
     Duration timeout = const Duration(seconds: 10),
   }) async {
@@ -457,10 +471,17 @@ class BleDataCubit extends Cubit<BleDataState> {
       return null;
     }
 
+    final remoteId = _connectCubit.state.remoteId;
+    if (remoteId == null) {
+      debugPrint('[数据管理] sendDeviceStatusCommand 失败: 无 remoteId');
+      return null;
+    }
+
     _deviceStatusCompleter = Completer<DeviceStatus?>();
     try {
-      await _bleService.writeData(_deviceStatusCommand);
-      debugPrint('[数据管理] 设备状态查询已发送，等待 0x87 响应...');
+      final cmd = _buildDeviceStatusCommand(remoteId);
+      await _bleService.writeData(cmd);
+      debugPrint('[数据管理] 设备状态查询已发送（MAC=$remoteId），等待 0x87 响应...');
       return await _deviceStatusCompleter!.future.timeout(timeout, onTimeout: () {
         debugPrint('[数据管理] 设备状态查询超时');
         return null;
@@ -941,11 +962,16 @@ class BleDataCubit extends Cubit<BleDataState> {
         emit(state.copyWith(lastReceived: bytes, rawLog: log));
       }
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x87) {
-      // 0x87：设备状态查询响应，命令 0x07 触发，bytes[2..7] 为6字节内容（模式+错误+时间）
-      if (bytes.length >= 8) {
-        final status = DeviceStatus.fromBytes(bytes.sublist(2, 8));
+      // 0x87：设备状态查询响应，命令 0x07 触发
+      // 帧结构：[7D 87] [..2B] [ID 10B bytes4..13] [模式 1B] [错误 1B] [时间 4B BE] [0D]
+      if (bytes.length >= 21) {
+        final status = DeviceStatus.fromBytes(bytes);
         debugPrint('[数据管理] 设备状态: $status');
-        emit(state.copyWith(lastReceived: bytes, rawLog: log));
+        emit(state.copyWith(
+          deviceId: status.deviceId,
+          lastReceived: bytes,
+          rawLog: log,
+        ));
         if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
           _deviceStatusCompleter!.complete(status);
         }

@@ -11,8 +11,8 @@ class AppConstants {
   static const double temperatureMin = 28.0;
   static const double temperatureMax = 38.0;
 
-  // 快捷预设温度
-  static const List<double> temperaturePresets = [28, 30, 33, 36];
+  // 快捷预设温度（28-38 均分 4 档）
+  static const List<double> temperaturePresets = [28, 31, 35, 38];
 
   // 快捷预设名称
   static const List<String> temperaturePresetNames = ['节能', '舒适', '温暖', '高温'];

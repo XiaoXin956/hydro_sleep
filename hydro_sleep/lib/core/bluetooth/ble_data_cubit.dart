@@ -35,6 +35,7 @@ class BleDataState extends Equatable {
   final String? deviceId; // 0x87 响应中返回的设备 ID（bytes[4..13]）
   final List<int>? lastReceived;
   final List<String> rawLog;
+  final List<String> sentLog; // 发送数据日志（最新200条）
 
   /// 最新一条实时秒数据（0x85）
   final RetransmitRecord? latestSecondRecord;
@@ -53,6 +54,7 @@ class BleDataState extends Equatable {
     this.deviceId,
     this.lastReceived,
     this.rawLog = const [],
+    this.sentLog = const [],
     this.latestSecondRecord,
     this.secondRecords = const [],
     this.latestMinuteRecord,
@@ -67,6 +69,7 @@ class BleDataState extends Equatable {
     String? deviceId,
     List<int>? lastReceived,
     List<String>? rawLog,
+    List<String>? sentLog,
     RetransmitRecord? latestSecondRecord,
     List<RetransmitRecord>? secondRecords,
     Retransmit30Record? latestMinuteRecord,
@@ -80,6 +83,7 @@ class BleDataState extends Equatable {
       deviceId: deviceId ?? this.deviceId,
       lastReceived: lastReceived ?? this.lastReceived,
       rawLog: rawLog ?? this.rawLog,
+      sentLog: sentLog ?? this.sentLog,
       latestSecondRecord: latestSecondRecord ?? this.latestSecondRecord,
       secondRecords: secondRecords ?? this.secondRecords,
       latestMinuteRecord: latestMinuteRecord ?? this.latestMinuteRecord,
@@ -96,6 +100,7 @@ class BleDataState extends Equatable {
         deviceId,
         lastReceived,
         rawLog,
+        sentLog,
         latestSecondRecord,
         secondRecords,
         latestMinuteRecord,
@@ -242,6 +247,25 @@ class BleDataCubit extends Cubit<BleDataState> {
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
   ];
 
+  /// 写入数据并记录发送日志
+  Future<void> _writeWithLog(List<int> data) async {
+    await _bleService.writeData(data);
+
+    final now = DateTime.now();
+    final time =
+        '${now.hour.toString().padLeft(2, '0')}:'
+        '${now.minute.toString().padLeft(2, '0')}:'
+        '${now.second.toString().padLeft(2, '0')}';
+    final hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    final logEntry = '$time  $hex';
+
+    final log = List<String>.from(state.sentLog)..add(logEntry);
+    if (log.length > _maxLogEntries) {
+      log.removeAt(0);
+    }
+    emit(state.copyWith(sentLog: log));
+  }
+
   void _onConnectStateChanged(BleConnectState connectState) {
     debugPrint('[数据管理] 连接状态变化: ${connectState.status}');
     if (connectState.status == BleConnectStatus.connected) {
@@ -386,7 +410,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
     _responseCompleter = Completer<bool>();
     try {
-      await _bleService.writeData(data);
+      await _writeWithLog(data);
       debugPrint('[数据管理] 命令已发送，等待响应...');
       return await _responseCompleter!.future.timeout(timeout, onTimeout: () {
         debugPrint('[数据管理] 等待响应超时');
@@ -414,7 +438,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _modeCommandCompleter = Completer<int>();
     try {
       final cmd = [..._modeCommandPrefix, mode, 0x0D];
-      await _bleService.writeData(cmd);
+      await _writeWithLog(cmd);
       debugPrint('[数据管理] 模式设定命令已发送 mode=0x${mode.toRadixString(16)}，等待 0x84 响应...');
       return await _modeCommandCompleter!.future.timeout(timeout, onTimeout: () {
         debugPrint('[数据管理] 模式设定响应超时');
@@ -457,7 +481,7 @@ class BleDataCubit extends Cubit<BleDataState> {
       0x00,
     ];
     debugPrint('[数据管理] sendDeviceControlCommand: ${frame.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
-    await _bleService.writeData(frame);
+    await _writeWithLog(frame);
     return true;
   }
 
@@ -480,7 +504,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _deviceStatusCompleter = Completer<DeviceStatus?>();
     try {
       final cmd = _buildDeviceStatusCommand(remoteId);
-      await _bleService.writeData(cmd);
+      await _writeWithLog(cmd);
       debugPrint('[数据管理] 设备状态查询已发送（MAC=$remoteId），等待 0x87 响应...');
       return await _deviceStatusCompleter!.future.timeout(timeout, onTimeout: () {
         debugPrint('[数据管理] 设备状态查询超时');
@@ -511,7 +535,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _parametersCompleter = Completer<DeviceParameters?>();
     try {
       final cmd = [..._paramCommandPrefix, 0x01, 0x0D];
-      await _bleService.writeData(cmd);
+      await _writeWithLog(cmd);
       debugPrint('[数据管理] 参数读取命令已发送，等待 0x8A 响应...');
       return await _parametersCompleter!.future.timeout(timeout, onTimeout: () {
         debugPrint('[数据管理] 参数读取超时');
@@ -570,7 +594,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _reportBatchReceived = 0;
     _lastReportAsciiId = '';
     try {
-      await _bleService.writeData(_reportQueryCommand);
+      await _writeWithLog(_reportQueryCommand);
       debugPrint('[数据管理] 报表查询已发送，等待 0x93 响应...');
       return await _reportQueryCompleter!.future.timeout(
         timeout,
@@ -613,7 +637,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     ];
     debugPrint('[数据管理] 读取存储数据: startTime=0x${startTime.toRadixString(16)}, seq=$seq');
     try {
-      await _bleService.writeData(cmd);
+      await _writeWithLog(cmd);
       return await _sleepDataCompleter!.future.timeout(
         timeout,
         onTimeout: () {
@@ -656,7 +680,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _retransmitCompleter = Completer<List<RetransmitRecord>>();
 
     try {
-      await _bleService.writeData(_retransmitCommand);
+      await _writeWithLog(_retransmitCommand);
       debugPrint('[数据管理] 重传指令已发送，等待 0x81 响应...');
 
       // 超时保底：即使数据不完整也返回已收到的
@@ -709,7 +733,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _retransmit30Completer = Completer<List<Retransmit30Record>>();
 
     try {
-      await _bleService.writeData(_retransmit30Command);
+      await _writeWithLog(_retransmit30Command);
       debugPrint('[数据管理] 重传指令(30分钟)已发送，等待 0x82 响应...');
 
       final result = await _retransmit30Completer!.future.timeout(
@@ -758,7 +782,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
     _firmwareVersionCompleter = Completer<String?>();
     try {
-      await _bleService.writeData(_firmwareVersionCommand);
+      await _writeWithLog(_firmwareVersionCommand);
       debugPrint('[数据管理] 固件版本查询已发送，等待 0x8C 响应...');
       final version = await _firmwareVersionCompleter!.future.timeout(
         timeout,

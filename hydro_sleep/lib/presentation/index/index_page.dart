@@ -6,6 +6,7 @@ import 'package:hydro_sleep/presentation/index/widgets/mode_selection_card.dart'
 import 'package:hydro_sleep/presentation/index/widgets/water_level_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/schedule_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/temperature_control_card.dart';
+import 'package:hydro_sleep/presentation/index/widgets/sent_data_log_card.dart';
 
 /// 首页索引页（Tab 0）
 class IndexPage extends StatelessWidget {
@@ -45,11 +46,13 @@ class IndexPage extends StatelessWidget {
                   const ScheduleCard(),
                   const SizedBox(height: 16),
                   const BleDebugCard(),
+                  const SizedBox(height: 16),
+                  const SentDataLogCard(),
                   const SizedBox(height: 80),
                 ];
                 return items[index];
               },
-              childCount: 12,
+              childCount: 14,
             ),
           ),
         ),

@@ -8,14 +8,14 @@ class AppConstants {
   static const String defaultAvatarUrl = ''; // 暂无头像资源
 
   // 温度范围
-  static const double temperatureMin = 20.0;
-  static const double temperatureMax = 30.0;
+  static const double temperatureMin = 28.0;
+  static const double temperatureMax = 38.0;
 
   // 快捷预设温度
-  static const List<double> temperaturePresets = [18, 22, 25, 28];
+  static const List<double> temperaturePresets = [28, 30, 33, 36];
 
   // 快捷预设名称
-  static const List<String> temperaturePresetNames = ['Cal', 'Cambridge', 'Normal', 'Hot'];
+  static const List<String> temperaturePresetNames = ['节能', '舒适', '温暖', '高温'];
 
   // 日程默认值
   static const String defaultScheduleStart = '23:00';

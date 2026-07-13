@@ -21,7 +21,7 @@ class TemperatureControlCard extends StatefulWidget {
 }
 
 class _TemperatureControlCardState extends State<TemperatureControlCard> {
-  double _targetTemp = 24.0;
+  double _targetTemp = 30.0;
   bool _userDragging = false;
   bool _sending = false;
   int? _lastSyncedDeviceTemp;
@@ -30,7 +30,7 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
     if (_lastSyncedDeviceTemp == deviceTemp) return;
     _lastSyncedDeviceTemp = deviceTemp;
     if (!_userDragging && !_sending) {
-      _targetTemp = deviceTemp.toDouble().clamp(15.0, 30.0);
+      _targetTemp = deviceTemp.toDouble().clamp(28.0, 38.0);
     }
   }
 
@@ -98,14 +98,14 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
             // 滑块
             Row(
               children: [
-                const Text('15°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                const Text('28°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
                 Expanded(
                   child: Slider(
                     value: _targetTemp,
-                    min: 15.0,
-                    max: 30.0,
+                    min: 28.0,
+                    max: 38.0,
                     activeColor: AppColors.primary,
-                    divisions: 15,
+                    divisions: 10,
                     label: '${_targetTemp.toInt()}°',
                     onChanged: (value) {
                       setState(() {
@@ -119,7 +119,7 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
                     },
                   ),
                 ),
-                const Text('30°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
+                const Text('38°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
               ],
             ),
             Center(

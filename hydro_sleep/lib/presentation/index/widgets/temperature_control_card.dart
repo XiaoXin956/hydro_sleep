@@ -89,8 +89,8 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
     final currentTemp = deviceInfo?.actualTemp;
     final isConnected = connectState.status == BleConnectStatus.connected;
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
-    // 未连接 或 关机 → 置灰禁用
-    final disabled = !isConnected || poweredOff;
+    // 未连接 或 未收到设备信息 或 关机 → 置灰禁用
+    final disabled = !isConnected || deviceInfo == null || poweredOff;
 
     debugPrint('[温度卡片] status=${connectState.status}, '
         'isConnected=$isConnected, poweredOff=$poweredOff, disabled=$disabled');

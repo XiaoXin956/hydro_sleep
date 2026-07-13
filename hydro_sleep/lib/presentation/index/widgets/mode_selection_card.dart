@@ -53,7 +53,7 @@ class _ModeSelectionCardState extends State<ModeSelectionCard> {
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
     final isConnected =
         context.watch<BleConnectCubit>().state.status == BleConnectStatus.connected;
-    final disabled = !isConnected || poweredOff;
+    final disabled = !isConnected || deviceInfo == null || poweredOff;
 
     final modes = [
       (0, l10n.modeAuto, Icons.autorenew),

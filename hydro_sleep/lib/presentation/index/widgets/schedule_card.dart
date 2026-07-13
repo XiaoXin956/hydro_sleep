@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
@@ -15,12 +16,15 @@ class ScheduleCard extends StatelessWidget {
     final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
     final workTime = deviceInfo?.workTime;
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
+    final isConnected =
+        context.watch<BleConnectCubit>().state.status == BleConnectStatus.connected;
+    final disabled = !isConnected || poweredOff;
 
     return Card(
       child: Opacity(
-        opacity: poweredOff ? 0.5 : 1,
+        opacity: disabled ? 0.5 : 1,
         child: IgnorePointer(
-          ignoring: poweredOff,
+          ignoring: disabled,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

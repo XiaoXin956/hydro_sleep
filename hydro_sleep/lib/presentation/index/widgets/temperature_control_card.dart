@@ -67,18 +67,22 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
     final l10n = AppLocalizations.of(context)!;
     final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
     final currentTemp = deviceInfo?.actualTemp;
+    final isConnected =
+        context.watch<BleConnectCubit>().state.status == BleConnectStatus.connected;
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
+    // 未连接 或 关机 → 置灰禁用
+    final disabled = !isConnected || poweredOff;
 
     // 从设备同步目标温度
-    if (deviceInfo != null && !poweredOff) {
+    if (deviceInfo != null && !disabled) {
       _syncFromDevice(deviceInfo.targetTemp);
     }
 
     return Card(
       child: Opacity(
-        opacity: poweredOff ? 0.5 : 1,
+        opacity: disabled ? 0.5 : 1,
         child: IgnorePointer(
-          ignoring: poweredOff,
+          ignoring: disabled,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(

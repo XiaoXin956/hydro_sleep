@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
@@ -15,8 +16,11 @@ class WaterLevelCard extends StatelessWidget {
     final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
     final lowWater = deviceInfo?.lowWater;
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
+    final isConnected =
+        context.watch<BleConnectCubit>().state.status == BleConnectStatus.connected;
+    final disabled = !isConnected || poweredOff;
 
-    final isUnknown = poweredOff || lowWater == null;
+    final isUnknown = disabled || lowWater == null;
     final isAbnormal = !isUnknown && lowWater != 0;
 
     final color = isUnknown
@@ -25,7 +29,7 @@ class WaterLevelCard extends StatelessWidget {
     final icon = isUnknown
         ? Icons.help_outline
         : (isAbnormal ? Icons.warning_amber_rounded : Icons.water_drop);
-    final label = poweredOff
+    final label = disabled
         ? l10n.waterLevelUnknown
         : (lowWater == null
             ? l10n.waterLevelUnknown
@@ -33,11 +37,11 @@ class WaterLevelCard extends StatelessWidget {
 
     return Card(
       child: Opacity(
-        opacity: poweredOff ? 0.5 : 1,
+        opacity: disabled ? 0.5 : 1,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: IgnorePointer(
-            ignoring: poweredOff,
+            ignoring: disabled,
             child: Row(
               children: [
                 Icon(icon, color: color, size: 22),

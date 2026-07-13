@@ -51,6 +51,9 @@ class _ModeSelectionCardState extends State<ModeSelectionCard> {
     final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
     final workMode = deviceInfo?.workMode;
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
+    final isConnected =
+        context.watch<BleConnectCubit>().state.status == BleConnectStatus.connected;
+    final disabled = !isConnected || poweredOff;
 
     final modes = [
       (0, l10n.modeAuto, Icons.autorenew),
@@ -60,11 +63,11 @@ class _ModeSelectionCardState extends State<ModeSelectionCard> {
 
     return Card(
       child: Opacity(
-        opacity: poweredOff ? 0.5 : 1,
+        opacity: disabled ? 0.5 : 1,
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: IgnorePointer(
-            ignoring: poweredOff,
+            ignoring: disabled,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

@@ -63,15 +63,37 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
 
   @override
   Widget build(BuildContext context) {
+    return BlocBuilder<BleConnectCubit, BleConnectState>(
+      buildWhen: (prev, curr) => prev.status != curr.status,
+      builder: (context, connectState) {
+        return BlocBuilder<BleDataCubit, BleDataState>(
+          buildWhen: (prev, curr) =>
+              prev.deviceInfo != curr.deviceInfo ||
+              prev.status != curr.status,
+          builder: (context, dataState) {
+            return _buildContent(context, connectState, dataState);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context,
+    BleConnectState connectState,
+    BleDataState dataState,
+  ) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
+    final deviceInfo = dataState.deviceInfo;
     final currentTemp = deviceInfo?.actualTemp;
-    final isConnected =
-        context.watch<BleConnectCubit>().state.status == BleConnectStatus.connected;
+    final isConnected = connectState.status == BleConnectStatus.connected;
     final poweredOff = deviceInfo?.isPoweredOff ?? false;
     // 未连接 或 关机 → 置灰禁用
     final disabled = !isConnected || poweredOff;
+
+    debugPrint('[温度卡片] status=${connectState.status}, '
+        'isConnected=$isConnected, poweredOff=$poweredOff, disabled=$disabled');
 
     // 从设备同步目标温度
     if (deviceInfo != null && !disabled) {

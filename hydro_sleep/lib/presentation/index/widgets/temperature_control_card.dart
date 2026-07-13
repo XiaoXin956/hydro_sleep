@@ -108,19 +108,23 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
                     value: _targetTemp,
                     min: 28.0,
                     max: 38.0,
-                    activeColor: AppColors.primary,
+                    activeColor: disabled ? AppColors.textHint : AppColors.primary,
                     divisions: 10,
                     label: '${_targetTemp.toInt()}°',
-                    onChanged: (value) {
-                      setState(() {
-                        _userDragging = true;
-                        _targetTemp = value;
-                      });
-                    },
-                    onChangeEnd: (value) {
-                      _userDragging = false;
-                      _sendTargetTemp(value);
-                    },
+                    onChanged: disabled
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _userDragging = true;
+                              _targetTemp = value;
+                            });
+                          },
+                    onChangeEnd: disabled
+                        ? null
+                        : (value) {
+                            _userDragging = false;
+                            _sendTargetTemp(value);
+                          },
                   ),
                 ),
                 const Text('38°', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
@@ -149,7 +153,7 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
               ),
             ),
             const SizedBox(height: 4),
-            _presetGrid(theme),
+            _presetGrid(theme, disabled),
           ],
         ), // Column
       ),   // Padding
@@ -158,7 +162,7 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
     );       // Card
   }
 
-  Widget _presetGrid(ThemeData theme) {
+  Widget _presetGrid(ThemeData theme, bool disabled) {
     final presets = List.generate(
       AppConstants.temperaturePresets.length,
       (i) => _TemperaturePreset(
@@ -180,17 +184,23 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
         final preset = presets[index];
         final isSelected = _targetTemp == preset.temp;
         return InkWell(
-          onTap: () {
-            setState(() => _targetTemp = preset.temp);
-            _sendTargetTemp(preset.temp);
-          },
+          onTap: disabled
+              ? null
+              : () {
+                  setState(() => _targetTemp = preset.temp);
+                  _sendTargetTemp(preset.temp);
+                },
           child: Container(
             margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary.withValues(alpha: 0.1) : null,
+              color: isSelected && !disabled
+                  ? AppColors.primary.withValues(alpha: 0.1)
+                  : null,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? AppColors.primary : AppColors.divider,
+                color: isSelected && !disabled
+                    ? AppColors.primary
+                    : AppColors.divider,
                 width: 1,
               ),
             ),
@@ -202,7 +212,9 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    color: disabled
+                        ? AppColors.textHint
+                        : (isSelected ? AppColors.primary : AppColors.textPrimary),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -210,7 +222,9 @@ class _TemperatureControlCardState extends State<TemperatureControlCard> {
                   preset.label,
                   style: TextStyle(
                     fontSize: 10,
-                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                    color: disabled
+                        ? AppColors.textHint
+                        : (isSelected ? AppColors.primary : AppColors.textSecondary),
                   ),
                 ),
               ],

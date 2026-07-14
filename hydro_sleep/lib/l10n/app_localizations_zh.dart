@@ -283,4 +283,7 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get deleteDeviceConfirm => '2秒内再次点击确认删除';
+
+  @override
+  String get noData => '暂无数据';
 }

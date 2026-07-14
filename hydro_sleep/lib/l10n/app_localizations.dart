@@ -637,6 +637,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap delete again within 2s to confirm'**
   String get deleteDeviceConfirm;
+
+  /// No description provided for @noData.
+  ///
+  /// In en, this message translates to:
+  /// **'No Data'**
+  String get noData;
 }
 
 class _AppLocalizationsDelegate

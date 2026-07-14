@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
-import 'package:hydro_sleep/core/utils/mock_data.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 
@@ -31,33 +30,37 @@ class HeartRateChart extends StatelessWidget {
             BlocBuilder<DailyReportCubit, DailyReportState>(
               builder: (context, state) {
                 final hrData = state.heartRateCurve;
-                final hasData = hrData.isNotEmpty;
                 final startTime = state.curveStartTime;
 
-                final data = hasData
-                    ? hrData.map((e) => e.toDouble()).toList()
-                    : MockData.heartRateCurve;
-
-                final int avgHr, minHr, maxHr;
-                if (hasData) {
-                  final sum = hrData.reduce((a, b) => a + b);
-                  avgHr = (sum / hrData.length).round();
-                  minHr = hrData.reduce((a, b) => a < b ? a : b);
-                  maxHr = hrData.reduce((a, b) => a > b ? a : b);
-                } else {
-                  avgHr = MockData.avgHeartRate;
-                  minHr = MockData.minHeartRate;
-                  maxHr = MockData.maxHeartRate;
+                if (hrData.isEmpty || startTime == null) {
+                  return SizedBox(
+                    height: 80,
+                    child: Center(
+                      child: Text(
+                        l10n.noData,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
                 }
+
+                final data = hrData.map((e) => e.toDouble()).toList();
+
+                final sum = hrData.reduce((a, b) => a + b);
+                final avgHr = (sum / hrData.length).round();
+                final minHr = hrData.reduce((a, b) => a < b ? a : b);
+                final maxHr = hrData.reduce((a, b) => a > b ? a : b);
 
                 return Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _SummaryItem(theme: theme, label: l10n.average, value: '$avgHr', unit: l10n.bpm, hasData: hasData),
-                        _SummaryItem(theme: theme, label: l10n.minimum, value: '$minHr', unit: l10n.bpm, hasData: hasData),
-                        _SummaryItem(theme: theme, label: l10n.maximum, value: '$maxHr', unit: l10n.bpm, hasData: hasData),
+                        _SummaryItem(theme: theme, label: l10n.average, value: '$avgHr', unit: l10n.bpm),
+                        _SummaryItem(theme: theme, label: l10n.minimum, value: '$minHr', unit: l10n.bpm),
+                        _SummaryItem(theme: theme, label: l10n.maximum, value: '$maxHr', unit: l10n.bpm),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -79,17 +82,11 @@ class HeartRateChart extends StatelessWidget {
 
   static LineChartData _buildChart({
     required List<double> data,
-    required DateTime? startTime,
+    required DateTime startTime,
   }) {
     String xLabel(int index) {
-      if (startTime != null) {
-        final t = startTime.add(Duration(minutes: index));
-        return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-      }
-      final totalMin = 23 * 60 + index * 5;
-      final h = (totalMin ~/ 60) % 24;
-      final m = totalMin % 60;
-      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+      final t = startTime.add(Duration(minutes: index));
+      return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     }
 
     return LineChartData(
@@ -191,14 +188,12 @@ class _SummaryItem extends StatelessWidget {
   final String label;
   final String value;
   final String unit;
-  final bool hasData;
 
   const _SummaryItem({
     required this.theme,
     required this.label,
     required this.value,
     required this.unit,
-    required this.hasData,
   });
 
   @override
@@ -206,9 +201,9 @@ class _SummaryItem extends StatelessWidget {
     return Column(
       children: [
         Text(
-          hasData ? value : '--',
+          value,
           style: theme.textTheme.headlineMedium?.copyWith(
-            color: hasData ? AppColors.heartRate : Colors.grey,
+            color: AppColors.heartRate,
             fontWeight: FontWeight.bold,
           ),
         ),

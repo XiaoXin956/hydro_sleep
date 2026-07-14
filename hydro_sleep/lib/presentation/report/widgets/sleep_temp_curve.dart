@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
-import 'package:hydro_sleep/core/utils/mock_data.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 
@@ -59,21 +58,23 @@ class SleepTempCurve extends StatelessWidget {
             const SizedBox(height: 16),
             BlocBuilder<DailyReportCubit, DailyReportState>(
               builder: (context, state) {
-                // 优先用真实数据，无数据时用 mock
-                final List<double> stageData;
-                final DateTime startTime;
-                if (state.stageCurve.isNotEmpty) {
-                  stageData = state.stageCurve;
-                  startTime = state.curveStartTime!;
-                } else {
-                  stageData = MockData.sleepStagesCurve;
-                  // mock 默认 23:00
-                  final now = DateTime.now();
-                  startTime = DateTime(now.year, now.month, now.day, 23, 0);
+                if (state.stageCurve.isEmpty) {
+                  return SizedBox(
+                    height: 200,
+                    child: Center(
+                      child: Text(
+                        l10n.noData,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
                 }
-                final tempData = state.temperatureCurve.isNotEmpty
-                    ? state.temperatureCurve
-                    : MockData.temperatureCurve;
+
+                final stageData = state.stageCurve;
+                final startTime = state.curveStartTime!;
+                final tempData = state.temperatureCurve;
 
                 return SizedBox(
                   height: 200,

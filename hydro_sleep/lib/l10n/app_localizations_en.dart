@@ -285,4 +285,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteDeviceConfirm => 'Tap delete again within 2s to confirm';
+
+  @override
+  String get noData => 'No Data';
 }

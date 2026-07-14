@@ -110,5 +110,6 @@
   "reconnecting": "Reconnecting…",
   "delete": "Delete",
   "deleteDevice": "Delete device",
-  "deleteDeviceConfirm": "Tap delete again within 2s to confirm"
+  "deleteDeviceConfirm": "Tap delete again within 2s to confirm",
+  "noData": "No Data"
 }

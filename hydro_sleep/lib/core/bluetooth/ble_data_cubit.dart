@@ -471,16 +471,30 @@ class BleDataCubit extends Cubit<BleDataState> {
 
     final info = state.deviceInfo;
 
-    // 仅 info==null 时读本地缓存
-    final stored = info != null ? null : await _secureStorage.getDeviceParams();
+    // 设备参数：info 有则直接用，info==null 时读本地缓存，再无则默认值
+    int baseMode, baseTarget, baseActual, baseTime, baseWater;
+    if (info != null) {
+      baseMode   = info.workMode;
+      baseTarget = info.targetTemp;
+      baseActual = info.actualTemp;
+      baseTime   = info.workTime;
+      baseWater  = info.lowWater;
+    } else {
+      final stored = await _secureStorage.getDeviceParams();
+      baseMode   = stored['workMode']   ?? 0;
+      baseTarget = stored['targetTemp'] ?? 30;
+      baseActual = stored['actualTemp'] ?? 30;
+      baseTime   = stored['workTime']   ?? 8;
+      baseWater  = stored['lowWater']   ?? 0;
+    }
 
     final pPower      = power      ?? info?.powerStatus ?? 1;
-    final pMode       = mode       ?? info?.workMode ?? stored?['workMode'] ?? 0;
+    final pMode       = mode       ?? baseMode;
     final pWorkPower  = workPower  ?? info?.workPower ?? 0;
-    final pWorkTime   = workTime   ?? info?.workTime ?? stored?['workTime'] ?? 8;
-    final pTargetTemp = targetTemp ?? info?.targetTemp ?? stored?['targetTemp'] ?? 30;
-    final pLowWater   = lowWater   ?? info?.lowWater ?? stored?['lowWater'] ?? 0;
-    final pActualTemp = actualTemp ?? info?.actualTemp ?? stored?['actualTemp'] ?? 30;
+    final pWorkTime   = workTime   ?? baseTime;
+    final pTargetTemp = targetTemp ?? baseTarget;
+    final pLowWater   = lowWater   ?? baseWater;
+    final pActualTemp = actualTemp ?? baseActual;
 
     // 控制模式：自动(0) → 制冷/制热时手动(1)
     final pControlMode = (pMode == 1 || pMode == 2) ? 1 : 0;

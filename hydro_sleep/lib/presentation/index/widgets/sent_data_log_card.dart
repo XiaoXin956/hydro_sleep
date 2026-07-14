@@ -81,7 +81,7 @@ class SentDataLogCard extends StatelessWidget {
                                   child: Text(
                                     hex,
                                     style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
-                                    overflow: TextOverflow.ellipsis,
+                                    softWrap: true,
                                   ),
                                 ),
                               ],

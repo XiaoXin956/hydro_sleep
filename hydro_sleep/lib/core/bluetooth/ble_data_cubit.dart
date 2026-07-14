@@ -14,6 +14,7 @@ import 'package:hydro_sleep/domain/models/retransmit30_record.dart';
 import 'package:hydro_sleep/domain/models/report_summary.dart';
 import 'package:hydro_sleep/domain/models/sleep_minute_record.dart';
 import 'package:hydro_sleep/data/repositories/sleep_data_repository.dart';
+import 'package:hydro_sleep/data/storage/secure_storage_service.dart';
 
 // --- Status ---
 
@@ -121,6 +122,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   final BleConnectCubit _connectCubit;
   final BleService _bleService;
+  final SecureStorageService _secureStorage = SecureStorageService();
   StreamSubscription<BleConnectState>? _connectSub;
   StreamSubscription<BluetoothAdapterState>? _adapterSub;
   StreamSubscription<List<int>>? _dataSub;
@@ -452,8 +454,10 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
-  /// 发送设备控制帧 [A5 5A 电源 模式 功率 时间 目标温度 低水位 实际温度 0]
-  /// 读取当前 deviceInfo，仅覆盖非 null 字段后写入
+  /// 发送设备控制帧 [A5 5A 电源 模式 功率 时间 目标温度 低水位 实际温度 控制模式 0]
+  /// 优先读取 state.deviceInfo，无则读本地缓存，再无则用默认值
+  /// 控制模式：自动模式=0，手动（制冷/制热）=1
+
   Future<bool> sendDeviceControlCommand({
     int? power,
     int? mode,
@@ -464,20 +468,28 @@ class BleDataCubit extends Cubit<BleDataState> {
     int? actualTemp,
   }) async {
     if (state.status != BleDataStatus.streaming) return false;
-    final info = state.deviceInfo;
-    if (info == null) return false;
 
-    final ntcHigh = actualTemp ?? info.actualTemp;
+    final info = state.deviceInfo;
+
+    // 仅 info==null 时读本地缓存
+    final stored = info != null ? null : await _secureStorage.getDeviceParams();
+
+    final pPower      = power      ?? info?.powerStatus ?? 1;
+    final pMode       = mode       ?? info?.workMode ?? stored?['workMode'] ?? 0;
+    final pWorkPower  = workPower  ?? info?.workPower ?? 0;
+    final pWorkTime   = workTime   ?? info?.workTime ?? stored?['workTime'] ?? 8;
+    final pTargetTemp = targetTemp ?? info?.targetTemp ?? stored?['targetTemp'] ?? 30;
+    final pLowWater   = lowWater   ?? info?.lowWater ?? stored?['lowWater'] ?? 0;
+    final pActualTemp = actualTemp ?? info?.actualTemp ?? stored?['actualTemp'] ?? 30;
+
+    // 控制模式：自动(0) → 制冷/制热时手动(1)
+    final pControlMode = (pMode == 1 || pMode == 2) ? 1 : 0;
 
     final frame = [
       0xA5, 0x5A,
-      power      ?? info.powerStatus,
-      mode       ?? info.workMode,
-      workPower  ?? info.workPower,
-      workTime   ?? info.workTime,
-      targetTemp ?? info.targetTemp,
-      lowWater   ?? info.lowWater,
-      ntcHigh,
+      pPower, pMode, pWorkPower, pWorkTime,
+      pTargetTemp, pLowWater, pActualTemp,
+      pControlMode,
       0x00,
     ];
     debugPrint('[数据管理] sendDeviceControlCommand: ${frame.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
@@ -831,12 +843,21 @@ class BleDataCubit extends Cubit<BleDataState> {
     if (bytes.length >= _deviceInfoLength &&
         bytes[0] == _headerDeviceByte1 &&
         bytes[1] == _headerDeviceByte2) {
-      // 设备信息（A5 5A 帧头，11 字节，自动推送）
+      // 设备信息（A5 5A 帧头，自动推送，11 字节）
       final info = DeviceInfo.fromBytes(bytes);
       debugPrint('[数据管理] 设备信息: $info');
       emit(state.copyWith(deviceInfo: info, lastReceived: bytes, rawLog: log));
 
-      // 每 10 秒存储一次实际温度
+      // 本地缓存设备参数（供断开/开机使用）
+      unawaited(_secureStorage.saveDeviceParams(
+        workMode: info.workMode,
+        targetTemp: info.targetTemp,
+        actualTemp: info.actualTemp,
+        workTime: info.workTime,
+        lowWater: info.lowWater,
+      ));
+
+      // 每 10 秒存储一次实际温度到 Isar
       final now = DateTime.now();
       if (now.difference(_lastTempSaveTime).inSeconds >= 10) {
         _lastTempSaveTime = now;

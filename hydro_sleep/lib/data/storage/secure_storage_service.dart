@@ -18,6 +18,12 @@ class SecureStorageService {
   static const _keyHistoryDevices = 'history_devices';
   static const _keyLastDeviceId = 'last_device_id';
   static const _keyBedExitShutdown = 'bed_exit_shutdown';
+  // 设备参数（本地缓存，供断开后重连/开机使用）
+  static const _keyDeviceWorkMode = 'device_work_mode';
+  static const _keyDeviceTargetTemp = 'device_target_temp';
+  static const _keyDeviceActualTemp = 'device_actual_temp';
+  static const _keyDeviceWorkTime = 'device_work_time';
+  static const _keyDeviceLowWater = 'device_low_water';
 
   // 主题
   Future<String?> getTheme() async => await _storage.read(key: _keyTheme);
@@ -62,4 +68,36 @@ class SecureStorageService {
       await _storage.read(key: _keyBedExitShutdown);
   Future<void> saveBedExitShutdown(String value) async =>
       await _storage.write(key: _keyBedExitShutdown, value: value);
+
+  // 设备参数（供断开后重连/开机使用，模式调整后保存）
+  Future<Map<String, int>> getDeviceParams() async {
+    final mode = await _storage.read(key: _keyDeviceWorkMode);
+    final target = await _storage.read(key: _keyDeviceTargetTemp);
+    final actual = await _storage.read(key: _keyDeviceActualTemp);
+    final time = await _storage.read(key: _keyDeviceWorkTime);
+    final water = await _storage.read(key: _keyDeviceLowWater);
+    return {
+      'workMode': mode != null ? int.tryParse(mode) ?? 0 : 0,
+      'targetTemp': target != null ? int.tryParse(target) ?? 30 : 30,
+      'actualTemp': actual != null ? int.tryParse(actual) ?? 30 : 30,
+      'workTime': time != null ? int.tryParse(time) ?? 8 : 8,
+      'lowWater': water != null ? int.tryParse(water) ?? 0 : 0,
+    };
+  }
+
+  Future<void> saveDeviceParams({
+    required int workMode,
+    required int targetTemp,
+    required int actualTemp,
+    required int workTime,
+    required int lowWater,
+  }) async {
+    await Future.wait([
+      _storage.write(key: _keyDeviceWorkMode, value: '$workMode'),
+      _storage.write(key: _keyDeviceTargetTemp, value: '$targetTemp'),
+      _storage.write(key: _keyDeviceActualTemp, value: '$actualTemp'),
+      _storage.write(key: _keyDeviceWorkTime, value: '$workTime'),
+      _storage.write(key: _keyDeviceLowWater, value: '$lowWater'),
+    ]);
+  }
 }

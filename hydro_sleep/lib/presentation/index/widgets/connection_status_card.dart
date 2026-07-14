@@ -115,8 +115,11 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
     }
 
     if (isConnected) {
-      final powerStatus = context.watch<BleDataCubit>().state.deviceInfo?.powerStatus ?? 0;
+      final deviceInfo = context.watch<BleDataCubit>().state.deviceInfo;
+      final powerStatus = deviceInfo?.powerStatus ?? 0;
       final isOn = powerStatus == 1;
+      // deviceInfo 为 null 表示连接后尚未收到 A5 5A，按钮仍可用但图标灰色
+      final hasDeviceInfo = deviceInfo != null;
 
       return Row(
         children: [
@@ -125,6 +128,7 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
           Expanded(
             child: Text(deviceName ?? '', style: theme.textTheme.bodyMedium),
           ),
+          // 电源按钮始终可点击（不受 IgnorePointer 影响）
           _togglingPower
           ? const SizedBox(
               width: 40,
@@ -134,13 +138,16 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
               ),
             )
           : GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () => _togglePower(powerStatus),
               child: SizedBox(
                 width: 40,
                 height: 40,
                 child: Icon(
                   Icons.power_settings_new,
-                  color: isOn ? AppColors.success : AppColors.textHint,
+                  color: hasDeviceInfo
+                      ? (isOn ? AppColors.success : AppColors.textHint)
+                      : AppColors.textHint,
                   size: 24,
                 ),
               ),

@@ -46,6 +46,8 @@ class BleDataState extends Equatable {
   final Retransmit30Record? latestMinuteRecord;
   /// 实时分钟数据缓冲区（最多 30 条）
   final List<Retransmit30Record> minuteRecords;
+  /// 0x13 报表查询加载中
+  final bool reportQueryLoading;
 
   const BleDataState({
     this.status = BleDataStatus.idle,
@@ -60,6 +62,7 @@ class BleDataState extends Equatable {
     this.secondRecords = const [],
     this.latestMinuteRecord,
     this.minuteRecords = const [],
+    this.reportQueryLoading = false,
   });
 
   BleDataState copyWith({
@@ -75,6 +78,7 @@ class BleDataState extends Equatable {
     List<RetransmitRecord>? secondRecords,
     Retransmit30Record? latestMinuteRecord,
     List<Retransmit30Record>? minuteRecords,
+    bool? reportQueryLoading,
   }) {
     return BleDataState(
       status: status ?? this.status,
@@ -89,6 +93,7 @@ class BleDataState extends Equatable {
       secondRecords: secondRecords ?? this.secondRecords,
       latestMinuteRecord: latestMinuteRecord ?? this.latestMinuteRecord,
       minuteRecords: minuteRecords ?? this.minuteRecords,
+      reportQueryLoading: reportQueryLoading ?? this.reportQueryLoading,
     );
   }
 
@@ -106,6 +111,7 @@ class BleDataState extends Equatable {
         secondRecords,
         latestMinuteRecord,
         minuteRecords,
+        reportQueryLoading,
       ];
 }
 
@@ -167,6 +173,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   DateTime _lastTempSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   static const _deviceInfoLength = 11;
+  static const _defaultTimeout = Duration(seconds: 15);
   static const _headerDeviceByte1 = 0xA5;
   static const _headerDeviceByte2 = 0x5A;
   static const _headerCmd0x81 = 0x81;
@@ -407,7 +414,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 返回 true 表示收到预期响应，false 表示超时或未连接
   Future<bool> sendCommand(
     List<int> data, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendCommand 失败: 未处于 streaming 状态');
@@ -434,7 +441,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 返回响应内容字节（0x20/0x21/0x22/0x30/0x31），null 表示超时
   Future<int?> sendModeCommand(
     int mode, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendModeCommand 失败: 未处于 streaming 状态');
@@ -519,7 +526,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 查询设备状态 0x07，等待 0x87 响应
   /// 返回 DeviceStatus（deviceId + 模式 + 错误 + 设备时间），null 表示超时或异常
   Future<DeviceStatus?> sendDeviceStatusCommand({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendDeviceStatusCommand 失败: 未处于 streaming 状态');
@@ -551,7 +558,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   /// 复位参数 0x0A+0x00，等待 0x8A 确认
   Future<bool> resetParameters({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) return false;
     final cmd = [..._paramCommandPrefix, 0x00, 0x0D];
@@ -560,7 +567,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   /// 读取参数 0x0A+0x01，等待 0x8A 返回 16 个 float 参数
   Future<DeviceParameters?> readParameters({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) return null;
     _parametersCompleter = Completer<DeviceParameters?>();
@@ -583,7 +590,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 设置参数 0x0A+0x02+[64字节]，等待 0x8A 确认
   Future<bool> setParameters(
     DeviceParameters params, {
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) return false;
     final cmd = [..._paramCommandPrefix, 0x02, ...params.toBytes(), 0x0D];
@@ -594,7 +601,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 可选传入指定时间，默认使用当前系统时间
   Future<bool> sendCalibrateClockCommand({
     DateTime? time,
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) return false;
     final t = time ?? DateTime.now();
@@ -613,7 +620,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 发送设备存储报表查询 0x13，等待设备回复 3 批 0x93 数据（共 15 组报表概要）
   /// 0x93 响应到达后自动保存到本地 Isar 数据库
   Future<List<ReportSummary>> sendReportQueryCommand({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendReportQueryCommand 失败: 未处于 streaming 状态');
@@ -624,19 +631,23 @@ class BleDataCubit extends Cubit<BleDataState> {
     _reportBuffer = [];
     _reportBatchReceived = 0;
     _lastReportAsciiId = '';
+    emit(state.copyWith(reportQueryLoading: true));
     try {
       final cmd = await _buildReportQueryCommand();
       await _writeWithLog(cmd);
       debugPrint('[数据管理] 报表查询已发送，等待 0x93 响应...');
-      return await _reportQueryCompleter!.future.timeout(
+      final result = await _reportQueryCompleter!.future.timeout(
         timeout,
         onTimeout: () {
           debugPrint('[数据管理] 报表查询超时，已收到 $_reportBatchReceived 批');
           return List.unmodifiable(_reportBuffer);
         },
       );
+      emit(state.copyWith(reportQueryLoading: false));
+      return result;
     } catch (e) {
       debugPrint('[数据管理] sendReportQueryCommand 异常: $e');
+      emit(state.copyWith(reportQueryLoading: false));
       return [];
     } finally {
       _reportQueryCompleter = null;
@@ -651,7 +662,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   Future<List<SleepMinuteRecord>> sendSleepDataReadCommand({
     required int startTime,
     required int seq,
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendSleepDataReadCommand 失败: 未处于 streaming 状态');
@@ -707,7 +718,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const _retransmit30RecordSize = 15;
 
   Future<List<RetransmitRecord>> sendRetransmitCommand({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendRetransmitCommand 失败: 未处于 streaming 状态');
@@ -760,7 +771,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   /// 发送重传指令 0x02（30分钟），等待设备回复 0x82 历史数据
   Future<List<Retransmit30Record>> sendRetransmit30Command({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendRetransmit30Command 失败: 未处于 streaming 状态');
@@ -812,7 +823,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   /// 发送固件版本查询命令，等待设备回复 0x8C 字符串
   Future<void> sendFirmwareVersionCommand({
-    Duration timeout = const Duration(seconds: 10),
+    Duration timeout = _defaultTimeout,
   }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendFirmwareVersionCommand 失败: 未处于 streaming 状态');
@@ -1052,6 +1063,8 @@ class BleDataCubit extends Cubit<BleDataState> {
         if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
           _deviceStatusCompleter!.complete(status);
         }
+        // 拿到 asciiId 后自动查询存储报表（0x13）
+        sendReportQueryCommand();
       } else {
         debugPrint('[数据管理] 0x87 响应数据不足: ${bytes.length}字节');
         emit(state.copyWith(lastReceived: bytes, rawLog: log));
@@ -1127,14 +1140,14 @@ class BleDataCubit extends Cubit<BleDataState> {
       if (bytes.length >= 28) {
         // 提取 ASCII ID（bytes[4..13]）
         _lastReportAsciiId = String.fromCharCodes(bytes.sublist(4, 14));
-        // 内容从 bytes[14] 开始（跳过帧头+类型+长度+UNCONFIGED）
+        // UNCONFIGED 10B ([4..13]) 之后，记录数据从 bytes[14] 开始（seq = 首条记录首字节）
         final seq = bytes[14];
         final frameHex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
         debugPrint('[数据管理] 0x93 报表批次 $seq/2，${bytes.length}字节，asciiId=$_lastReportAsciiId');
         debugPrint('[数据管理] 0x93 帧原始数据: $frameHex');
-        // 解析本批 5 组 × 26 字节（bytes[15] 开始）
+        // 解析本批 5 组 × 26 字节（bytes[14] 开始）
         for (var i = 0; i < 5; i++) {
-          final offset = 15 + i * 26;
+          final offset = 14 + i * 26;
           if (offset + 26 <= bytes.length - 1) { // 留出尾帧 0D
             final raw = bytes.sublist(offset, offset + 26);
             debugPrint('[数据管理] 0x93 组$i 原始数据: ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/report/daily/daily_report_content.dart';
@@ -46,9 +48,27 @@ class _ReportPageState extends State<ReportPage>
             pinned: true,
             expandedHeight: 100,
             flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                l10n.reportTitle,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+              title: BlocBuilder<BleDataCubit, BleDataState>(
+                buildWhen: (prev, curr) => prev.reportQueryLoading != curr.reportQueryLoading,
+                builder: (context, state) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        l10n.reportTitle,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      if (state.reportQueryLoading) ...[
+                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
               titlePadding: const EdgeInsets.only(left: 16, bottom: 48),
               centerTitle: false,

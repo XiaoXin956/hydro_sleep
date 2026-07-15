@@ -25,6 +25,20 @@ class SecureStorageService {
   static const _keyDeviceWorkTime = 'device_work_time';
   static const _keyDeviceLowWater = 'device_low_water';
 
+  /// 保存设备 ASCII ID（bytes[4..13]），key 按 remoteId 区分
+  String _asciiIdKey(String remoteId) => 'device_ascii_id_$remoteId';
+
+  Future<void> saveDeviceAsciiId(String remoteId, List<int> asciiId) async {
+    final hex = asciiId.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    await _storage.write(key: _asciiIdKey(remoteId), value: hex);
+  }
+
+  Future<List<int>?> getDeviceAsciiId(String remoteId) async {
+    final hex = await _storage.read(key: _asciiIdKey(remoteId));
+    if (hex == null || hex.isEmpty) return null;
+    return hex.split(' ').map((s) => int.parse(s, radix: 16)).toList();
+  }
+
   // 主题
   Future<String?> getTheme() async => await _storage.read(key: _keyTheme);
   Future<void> saveTheme(String theme) async =>

@@ -243,11 +243,15 @@ class BleDataCubit extends Cubit<BleDataState> {
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
   ];
 
-  /// 设备存储报表查询 0x13，请求设备发送存储的 15 组报表概要
-  static const _reportQueryCommand = [
-    0x7D, 0x13, 0x0F, 0x00,
-    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D,
-  ];
+  /// 构建设备存储报表查询 0x13 命令，ID 从本地缓存读取
+  Future<List<int>> _buildReportQueryCommand() async {
+    final remoteId = _connectCubit.state.remoteId;
+    final asciiId = remoteId != null
+        ? await _secureStorage.getDeviceAsciiId(remoteId)
+        : null;
+    final id = asciiId ?? [0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44];
+    return [0x7D, 0x13, 0x0F, 0x00, ...id, 0x0D];
+  }
 
   /// 写入数据并记录发送日志
   Future<void> _writeWithLog(List<int> data) async {
@@ -499,13 +503,14 @@ class BleDataCubit extends Cubit<BleDataState> {
     // 控制模式：自动(0) → 制冷/制热时手动(1)
     final pControlMode = (pMode == 1 || pMode == 2) ? 1 : 0;
 
-    final frame = [
-      0xA5, 0x5A,
+    final dataBytes = [
       pPower, pMode, pWorkPower, pWorkTime,
       pTargetTemp, pLowWater, pActualTemp,
       pControlMode,
-      0x00,
     ];
+    final checksum = dataBytes.fold<int>(0, (s, b) => s + b) & 0xFF;
+
+    final frame = [0xA5, 0x5A, ...dataBytes, checksum];
     debugPrint('[数据管理] sendDeviceControlCommand: ${frame.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
     await _writeWithLog(frame);
     return true;
@@ -620,7 +625,8 @@ class BleDataCubit extends Cubit<BleDataState> {
     _reportBatchReceived = 0;
     _lastReportAsciiId = '';
     try {
-      await _writeWithLog(_reportQueryCommand);
+      final cmd = await _buildReportQueryCommand();
+      await _writeWithLog(cmd);
       debugPrint('[数据管理] 报表查询已发送，等待 0x93 响应...');
       return await _reportQueryCompleter!.future.timeout(
         timeout,
@@ -653,9 +659,16 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
 
     _sleepDataCompleter = Completer<List<SleepMinuteRecord>>();
+
+    final remoteId = _connectCubit.state.remoteId;
+    final asciiId = remoteId != null
+        ? await _secureStorage.getDeviceAsciiId(remoteId)
+        : null;
+    final id = asciiId ?? [0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44];
+
     final cmd = [
       0x7D, 0x14, 0x14, 0x00,
-      0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+      ...id,
       startTime & 0xFF, (startTime >> 8) & 0xFF,
       (startTime >> 16) & 0xFF, (startTime >> 24) & 0xFF,
       seq,
@@ -1031,6 +1044,11 @@ class BleDataCubit extends Cubit<BleDataState> {
           lastReceived: bytes,
           rawLog: log,
         ));
+        // 保存 asciiId 到本地，key 为当前连接的 remoteId
+        final remoteId = _connectCubit.state.remoteId;
+        if (remoteId != null && status.asciiId.isNotEmpty) {
+          unawaited(_secureStorage.saveDeviceAsciiId(remoteId, status.asciiId));
+        }
         if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
           _deviceStatusCompleter!.complete(status);
         }

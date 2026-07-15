@@ -46,7 +46,7 @@ lib/
     enums/sleep_minute_status.dart - SleepMinuteStatus enum (deepSleep/lightSleep/rem/awake/outOfBed/sitting)
     models/history_device.dart - HistoryDevice (Equatable, JSON serialization)
     models/device_info.dart    - DeviceInfo（A5 5A 帧头解析：powerStatus[2], workMode[3], workPower[4], workTime[5], targetTemp[6], lowWater[7], actualTemp[8]）；`isPoweredOff` getter（powerStatus == 0）
-    models/device_status.dart  - DeviceStatus（deviceId 10B MAC + mode + error + timestamp BE，从完整 0x87 帧解析）
+    models/device_status.dart  - DeviceStatus（deviceId 10B MAC hex 字符串 + asciiId List<int> 原始字节 + mode + error + timestamp BE，从完整 0x87 帧解析）
     models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
     models/retransmit30_record.dart - Retransmit30Record（15字节/组：分钟级记录）
@@ -62,7 +62,7 @@ lib/
     index/index_page.dart             - Home tab content
     index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard, WaterLevelCard（三态：未知/正常/异常 + 关机灰化）
     report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly)
-    report/widgets/                   - DateHeader, SleepScoreCard（评分环形+总时长+入睡起床时间+DB查询+动画过渡）, SleepStagesSummary（深睡/浅睡/REM/清醒百分比+时长，TweenAnimationBuilder 350ms，无数据显示"-"）, SleepTempCurve（Y轴0-50，左侧睡眠阶段=10/20/30/40，右侧温度°C，双线+整数tooltip）, HeartRateChart（max/min/avg，Y轴20-220，6标签）,
+    report/widgets/                   - DateHeader, SleepScoreCard（评分环形+总时长+入睡起床时间+DB查询+动画过渡）, SleepStagesSummary（深睡/浅睡/REM/清醒百分比+时长，TweenAnimationBuilder 350ms，无数据显示"-"）, SleepTempCurve（Y轴0-50，左侧睡眠阶段=10/20/30/40，右侧温度°C，双线+整数tooltip，无数据显示"暂无数据"）, HeartRateChart（max/min/avg，Y轴20-220，6标签，无数据显示"暂无数据"）,
                                       RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
                                       DeviceStatusTestCard, HeartbeatTestCard, PressureCalibrateTestCard,
                                       ParameterTestCard, ClockCalibrateTestCard,
@@ -143,8 +143,10 @@ flutter run
   - 数据读取（0x14）→ 0x94：startTime + seq(0~47)，返回30分钟×4字节 SleepMinuteRecord，`sendSleepDataReadCommand(startTime, seq)`
   - **ReportSummary 字节序**：timestamp 4B 大端序，其余 uint16 字段均大端序（`_u16BE`）
   - **缓冲清理**：0x93 批次完成后清理 `_reportBuffer`、`_reportBatchReceived`、`_lastReportAsciiId`
-  - 设备控制：`sendDeviceControlCommand(power/mode/workPower/workTime/targetTemp/lowWater)` 读取当前 `DeviceInfo` 状态，覆盖指定字段后发送 11 字节 `[A5 5A ...]` 帧
-  - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析（workMode: 0=自动, 1=制冷, 2=制热）
+  - 设备控制：`sendDeviceControlCommand(power/mode/workPower/workTime/targetTemp/lowWater)` 读取当前 `DeviceInfo` 状态，覆盖指定字段后发送 11 字节 `[A5 5A ...]` 帧；末字节为 bytes[2..9] 求和校验（十进制相加 → 十六进制），新增 controlMode 字节 [9]（0=自动，1=手动制冷/制热），共 11 字节
+  - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析（workMode: 0=自动, 1=制冷, 2=制热），每次收到后 `unawaited()` 缓存设备参数到 SecureStorage
+  - 0x87 响应解析后，`asciiId`（bytes[4..13] 原始字节）以 hex 字符串存入 SecureStorage，key = `device_ascii_id_{remoteId}`
+  - 0x13/0x14 命令帧 bytes[4..13] 使用 SecureStorage 缓存的 `asciiId` 替代固定 "UNCONFIGED"，无缓存时 fallback 为 "UNCONFIGED"
   - 详细协议文档见 `BLE_PROTOCOL.md`
 - **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除
 - **设备关机 UI 模式**：`deviceInfo.isPoweredOff`（`powerStatus == 0`）时，首页模式/水位/温度/工作时间卡片使用 `Opacity(0.5)` + `IgnorePointer(ignoring: true)` 灰化禁用

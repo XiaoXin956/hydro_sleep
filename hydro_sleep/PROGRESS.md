@@ -132,6 +132,20 @@
   - 标题改为"工作时间"，删除"睡眠期间自动调节"开关，只显示一个时间 chip
 - [x] 通用设置 BlocBuilder 重构
   - ModePreferenceSelector 改用 BlocBuilder 实时同步设备 workMode 状态
+- [x] 首页卡片关机灰化 + 电源按钮始终可用
+  - 温度/模式/水位/工作时间卡片：未连接 或 deviceInfo==null 或 关机 → 灰化（Opacity+IgnorePointer+onChanged:null）
+  - 电源按钮：HitTestBehavior.opaque，始终可点击（未收到 A5 5A 时灰色图标）
+- [x] A5 5A 协议扩展：controlMode[9] + 本地参数缓存 + 校验和
+  - controlMode 字节 [9]：0=自动，1=手动（制冷/制热触发），关机再开机恢复自动
+  - 设备参数本地缓存：每次收到 A5 5A 后 `unawaited()` 写入 SecureStorage
+  - info==null 时 fallback：SecureStorage 缓存 → 默认值（mode=0, target=30, actual=30, time=8）
+  - 帧末字节为 bytes[2..9] 十进制求和后转十六进制校验和
+- [x] DeviceStatus 新增 asciiId（bytes[4..13] 原始字节 List<int>）
+- [x] 报告页 MockData 移除
+  - SleepTempCurve / HeartRateChart 无数据时显示"暂无数据"，不再使用 MockData
+  - 新增 l10n key `noData`（中："暂无数据"，英："No Data"）
+- [x] 0x87 响应保存 asciiId 到 SecureStorage（key=device_ascii_id_{remoteId}）
+- [x] 0x13/0x14 命令帧 ID 替换：bytes[4..13] 使用 SecureStorage 缓存的 asciiId，无缓存时 fallback 为 "UNCONFIGED"
 
 ## 待完成
 

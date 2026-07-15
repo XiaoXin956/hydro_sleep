@@ -161,7 +161,6 @@ class BleDataCubit extends Cubit<BleDataState> {
   // 报表查询相关（0x13/0x93）
   Completer<List<ReportSummary>>? _reportQueryCompleter;
   List<ReportSummary> _reportBuffer = [];
-  static const _reportBatchCount = 3; // 设备分 3 批发送
   int _reportBatchReceived = 0;
   String _lastReportAsciiId = '';
 
@@ -1156,7 +1155,10 @@ class BleDataCubit extends Cubit<BleDataState> {
         }
         _reportBatchReceived++;
         emit(state.copyWith(lastReceived: bytes, rawLog: log));
-        if (_reportBatchReceived >= _reportBatchCount) {
+        // 仅末尾批次带 0x0D 结束符
+        final isLastBatch = bytes.last == 0x0D;
+        debugPrint('[数据管理] 0x93 批次$_reportBatchReceived，尾帧=${isLastBatch ? "是" : "否"}');
+        if (isLastBatch) {
           debugPrint('[数据管理] 报表查询完成: ${_reportBuffer.length} 条');
           // 收到全部 3 批，自动保存到数据库
           final deviceId = _connectCubit.state.remoteId;

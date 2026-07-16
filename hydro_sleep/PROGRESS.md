@@ -152,6 +152,13 @@
   - 时间戳：大端序 → **小端序**（`(t3<<24)|(t2<<16)|(t1<<8)|t0`），`*1000` 转毫秒，去掉手动 +28800 时区偏移
   - uint16 数据字段：小端序 → **大端序**（`_u16LE` → `_u16BE`）
   - 0x93 帧解析偏移条件：`offset + 26 <= bytes.length - 1` → `offset + 26 <= bytes.length`（修复末尾记录被跳过）
+- [x] SleepMinuteRecord 字段扩展
+  - 新增字段：dateTime、snoreCount、respiratoryObstruction、pthd、temp
+  - 新增工厂方法 `fromRetransmit30Bytes()`（从 0x82 的 15 字节解析）
+  - 所有字段添加详细注释（字节来源、含义、单位）
+  - 新增字段均为 nullable，0x94 解析不受影响
+- [x] 发送数据记录卡片 SentDataLogCard 长数据显示修复
+  - 删除 `overflow: TextOverflow.ellipsis`，改为 `softWrap: true`，长 hex 数据完整换行显示
 
 ## 待完成
 

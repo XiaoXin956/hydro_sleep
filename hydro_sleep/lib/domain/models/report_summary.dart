@@ -40,28 +40,31 @@ class ReportSummary {
     final t2 = bytes[offset + 2];
     final t3 = bytes[offset + 3];
     final isAllFF = t0 == 0xFF && t1 == 0xFF && t2 == 0xFF && t3 == 0xFF;
-    final timeRaw = (t0 << 24) | (t1 << 16) | (t2 << 8) | t3;
+    final timeRaw = (t3 << 24) | (t2 << 16) | (t1 << 8) | t0;
+    final timeTemp = isAllFF || timeRaw == 0
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000);
 
-    return ReportSummary(
-      startTime: isAllFF || timeRaw == 0
-          ? null
-          : DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000),
-      totalSleepMinutes: _u16LE(bytes, offset + 4),
-      sleepEfficiency: _u16LE(bytes, offset + 6),
-      sleepQuality: _u16LE(bytes, offset + 8),
-      turnOverCount: _u16LE(bytes, offset + 10),
-      sleepLatencyMinutes: _u16LE(bytes, offset + 12),
-      leaveBedCount: _u16LE(bytes, offset + 14),
-      sleepRhythmPhase: _u16LE(bytes, offset + 16),
-      reserved1: _u16LE(bytes, offset + 18),
-      longestSleepStartMinute: _u16LE(bytes, offset + 20),
-      ahiIndex: _u16LE(bytes, offset + 22),
-      snoreTotalCount: _u16LE(bytes, offset + 24),
+    var summary = ReportSummary(
+      startTime: timeTemp,
+      totalSleepMinutes: _u16BE(bytes, offset + 4),
+      sleepEfficiency: _u16BE(bytes, offset + 6),
+      sleepQuality: _u16BE(bytes, offset + 8),
+      turnOverCount: _u16BE(bytes, offset + 10),
+      sleepLatencyMinutes: _u16BE(bytes, offset + 12),
+      leaveBedCount: _u16BE(bytes, offset + 14),
+      sleepRhythmPhase: _u16BE(bytes, offset + 16),
+      reserved1: _u16BE(bytes, offset + 18),
+      longestSleepStartMinute: _u16BE(bytes, offset + 20),
+      ahiIndex: _u16BE(bytes, offset + 22),
+      snoreTotalCount: _u16BE(bytes, offset + 24),
     );
+
+    return summary;
   }
 
-  static int _u16LE(List<int> bytes, int offset) =>
-      bytes[offset] | (bytes[offset + 1] << 8);
+  static int _u16BE(List<int> bytes, int offset) =>
+      (bytes[offset] << 8) | bytes[offset + 1];
 
   @override
   String toString() =>

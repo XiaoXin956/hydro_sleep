@@ -1147,7 +1147,7 @@ class BleDataCubit extends Cubit<BleDataState> {
         // 解析本批 5 组 × 26 字节（bytes[14] 开始）
         for (var i = 0; i < 5; i++) {
           final offset = 14 + i * 26;
-          if (offset + 26 <= bytes.length - 1) { // 留出尾帧 0D
+          if (offset + 26 <= bytes.length) {
             final raw = bytes.sublist(offset, offset + 26);
             debugPrint('[数据管理] 0x93 组$i 原始数据: ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
             _reportBuffer.add(ReportSummary.fromBytes(bytes, offset));

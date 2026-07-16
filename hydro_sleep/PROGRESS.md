@@ -147,6 +147,12 @@
 - [x] 0x87 响应保存 asciiId 到 SecureStorage（key=device_ascii_id_{remoteId}）
 - [x] 0x13/0x14 命令帧 ID 替换：bytes[4..13] 使用 SecureStorage 缓存的 asciiId，无缓存时 fallback 为 "UNCONFIGED"
 
+### 2026-07-16
+- [x] ReportSummary 字节序修正
+  - 时间戳：大端序 → **小端序**（`(t3<<24)|(t2<<16)|(t1<<8)|t0`），`*1000` 转毫秒，去掉手动 +28800 时区偏移
+  - uint16 数据字段：小端序 → **大端序**（`_u16LE` → `_u16BE`）
+  - 0x93 帧解析偏移条件：`offset + 26 <= bytes.length - 1` → `offset + 26 <= bytes.length`（修复末尾记录被跳过）
+
 ## 待完成
 
 ### BLoC 模块完善

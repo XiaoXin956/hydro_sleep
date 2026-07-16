@@ -50,7 +50,7 @@ lib/
     models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
     models/retransmit30_record.dart - Retransmit30Record（15字节/组：分钟级记录）
-    models/report_summary.dart       - ReportSummary（26字节：startTime 4B BE / 其余 uint16 均 BE：totalSleepMinutes/sleepEfficiency/sleepQuality/turnOverCount/sleepLatencyMinutes/leaveBedCount/sleepRhythmPhase/reserved1/longestSleepStartMinute/ahiIndex/snoreTotalCount）
+    models/report_summary.dart       - ReportSummary（26字节：startTime 4B **LE** / 其余 uint16 字段均 **BE**：totalSleepMinutes/sleepEfficiency/sleepQuality/turnOverCount/sleepLatencyMinutes/leaveBedCount/sleepRhythmPhase/reserved1/longestSleepStartMinute/ahiIndex/snoreTotalCount）
     models/sleep_minute_record.dart  - SleepMinuteRecord（4字节/组：mode, heartRate, breathRate, bodyMove）
   l10n/
     app_en.arb              - English translations (template)
@@ -141,7 +141,7 @@ flutter run
   - 恢复出厂（0x17）→ 0x97：无内容
   - 报表查询（0x13）→ 0x93：`[帧头2B(7D 93)][长度1B][序号1B(=bytes[3])][UNCONFIGED 10B][记录N×26B][0D仅末尾批]`，记录从 `bytes[14]` 开始，`contentLen ~/ 26` 组，`sendReportQueryCommand()`
   - 数据读取（0x14）→ 0x94：startTime + seq(0~47)，返回30分钟×4字节 SleepMinuteRecord，`sendSleepDataReadCommand(startTime, seq)`
-  - **ReportSummary 字节序**：timestamp 4B 大端序，其余 uint16 字段均小端序（`_u16LE`）
+  - **ReportSummary 字节序**：timestamp 4B **小端序**，其余 uint16 字段均**大端序**（`_u16BE`），`DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000)` 自动应用本地时区
   - **缓冲清理**：0x93 批次完成后清理 `_reportBuffer`、`_reportBatchReceived`、`_lastReportAsciiId`
   - 设备控制：`sendDeviceControlCommand(power/mode/workPower/workTime/targetTemp/lowWater)` 读取当前 `DeviceInfo` 状态，覆盖指定字段后发送 11 字节 `[A5 5A ...]` 帧；末字节为 bytes[2..9] 求和校验（十进制相加 → 十六进制），新增 controlMode 字节 [9]（0=自动，1=手动制冷/制热），共 11 字节
   - 设备信息：自动推送 `A5 5A` 开头11字节帧，由 `DeviceInfo.fromBytes()` 解析（workMode: 0=自动, 1=制冷, 2=制热），每次收到后 `unawaited()` 缓存设备参数到 SecureStorage

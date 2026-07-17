@@ -43,9 +43,9 @@ class BleDataState extends Equatable {
   /// 实时秒数据缓冲区（最多 120 条）
   final List<RetransmitRecord> secondRecords;
   /// 最新一条实时分钟数据（0x86）
-  final Retransmit30Record? latestMinuteRecord;
+  final SleepMinuteRecord? latestMinuteRecord;
   /// 实时分钟数据缓冲区（最多 30 条）
-  final List<Retransmit30Record> minuteRecords;
+  final List<SleepMinuteRecord> minuteRecords;
   /// 0x13 报表查询加载中
   final bool reportQueryLoading;
 
@@ -76,8 +76,8 @@ class BleDataState extends Equatable {
     List<String>? sentLog,
     RetransmitRecord? latestSecondRecord,
     List<RetransmitRecord>? secondRecords,
-    Retransmit30Record? latestMinuteRecord,
-    List<Retransmit30Record>? minuteRecords,
+    SleepMinuteRecord? latestMinuteRecord,
+    List<SleepMinuteRecord>? minuteRecords,
     bool? reportQueryLoading,
   }) {
     return BleDataState(
@@ -1027,13 +1027,33 @@ class BleDataCubit extends Cubit<BleDataState> {
         emit(state.copyWith(lastReceived: bytes, rawLog: log));
       }
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x86) {
-      // 0x86：实时分钟数据（每分钟），监控/调试模式下自动推送，15字节同 Retransmit30Record
-      if (bytes.length >= 17) {
-        final record = Retransmit30Record.fromBytes(bytes, 2);
-        final updated = List<Retransmit30Record>.from(state.minuteRecords)
+      // 0x86：实时分钟数据（每分钟），监控/调试模式下自动推送
+      // 帧结构：[7D 86][数据 15B][0D]
+      // 每组15字节: [序列号 1B][时间 4B LE][状态 1B][心率 1B][呼吸率 1B]
+      //            [体动 1B][打鼾数 1B][呼吸障碍数 1B][PTHD 2B LE][TEMP 2B LE]
+      if (bytes.length >= 18 && bytes[bytes.length - 1] == 0x0D) {
+        final record = SleepMinuteRecord.fromBytesWithTime(bytes, 2);
+        final updated = List<SleepMinuteRecord>.from(state.minuteRecords)
           ..add(record);
         if (updated.length > 30) updated.removeAt(0);
-        debugPrint('[数据管理] 0x86 分钟数据: seq=${record.sequenceNo}, hr=${record.heartRate}, br=${record.breathRate}');
+        debugPrint('[数据管理] 0x86 分钟数据: time=${record.dateTime}, '
+            'status=${record.statusName}, hr=${record.heartRate}, br=${record.breathRate}');
+
+        // 存入 DB
+        final deviceId = _connectCubit.state.remoteId;
+        if (deviceId != null && record.dateTime != null) {
+          unawaited(SleepDataRepository.saveSleepMinuteData(
+            deviceId: deviceId,
+            startTime: record.dateTime!,
+            groups: [(
+              statusByte: record.status,
+              heartRate: record.heartRate,
+              breathRate: record.breathRate,
+              bodyMove: record.bodyMovement,
+            )],
+          ));
+        }
+
         emit(state.copyWith(
           latestMinuteRecord: record,
           minuteRecords: updated,

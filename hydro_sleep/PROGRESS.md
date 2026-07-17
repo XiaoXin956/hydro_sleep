@@ -160,6 +160,18 @@
 - [x] 发送数据记录卡片 SentDataLogCard 长数据显示修复
   - 删除 `overflow: TextOverflow.ellipsis`，改为 `softWrap: true`，长 hex 数据完整换行显示
 
+### 2026-07-17
+- [x] SleepMinuteRecord 新增 `fromBytesWithTime` 工厂方法（0x86 专用，15字节，含全部扩展字段）
+- [x] 0x86 实时分钟数据解析升级
+  - `BleDataState.minuteRecords` 类型：`List<Retransmit30Record>` → `List<SleepMinuteRecord>`
+  - 0x86 处理改用 `SleepMinuteRecord.fromBytesWithTime`，等待 0x0D 尾帧后解析
+  - 每条记录自动存入 Isar DB（`SleepDataRepository.saveSleepMinuteData`）
+- [x] 首页 RealtimeDataCard（0x85 实时秒数据卡片）
+  - 位于 ModeSelectionCard 上方，每秒更新：时间、状态、心率、呼吸率
+  - BlocBuilder 监听 `BleDataState.latestSecondRecord`
+- [x] ReportSummary 新增 `dataLoaded` 字段
+  - 标记 0x14 详细分钟数据是否已拉取，Isar 保存时保留已有状态
+
 ## 待完成
 
 ### BLoC 模块完善

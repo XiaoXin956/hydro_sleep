@@ -1,8 +1,9 @@
-/// 睡眠分钟记录模型 — 解析 0x94 / 0x82 响应中的每分钟数据
+/// 睡眠分钟记录模型 — 解析 0x94 / 0x82 / 0x86 响应中的每分钟数据
 ///
 /// 0x94 每组 4 字节: [状态 1B][心率 1B][呼吸率 1B][体动 1B]
 /// 0x82 每组15 字节: [序列号 1B][时间 4B LE][状态 1B][心率 1B][呼吸率 1B]
 ///                    [体动 1B][打鼾数 1B][呼吸障碍数 1B][PTHD 2B LE][TEMP 2B LE]
+/// 0x86 每组15 字节: 同 0x82 格式
 ///
 /// 状态值:
 ///   实时: 0x01离床 0x02体动 0x03坐起 0x04睡眠 0x05清醒 0x06重物
@@ -54,6 +55,30 @@ class SleepMinuteRecord {
       heartRate: bytes[offset + 1],
       breathRate: bytes[offset + 2],
       bodyMovement: bytes[offset + 3],
+    );
+  }
+
+  /// 从 0x86 实时分钟数据 15 字节解析（同 0x82 格式，0x86 类型专用）
+  ///
+  /// 结构: [序列号 1B][时间 4B LE][状态 1B][心率 1B][呼吸率 1B]
+  ///       [体动 1B][打鼾数 1B][呼吸障碍数 1B][PTHD 2B LE][TEMP 2B LE]
+  factory SleepMinuteRecord.fromBytesWithTime(List<int> bytes, int offset) {
+    final timeRaw = bytes[offset + 1] |
+        (bytes[offset + 2] << 8) |
+        (bytes[offset + 3] << 16) |
+        (bytes[offset + 4] << 24);
+    return SleepMinuteRecord(
+      dateTime: timeRaw == 0
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000),
+      status: bytes[offset + 5],
+      heartRate: bytes[offset + 6],
+      breathRate: bytes[offset + 7],
+      bodyMovement: bytes[offset + 8],
+      snoreCount: bytes[offset + 9],
+      respiratoryObstruction: bytes[offset + 10],
+      pthd: bytes[offset + 11] | (bytes[offset + 12] << 8),
+      temp: bytes[offset + 13] | (bytes[offset + 14] << 8),
     );
   }
 

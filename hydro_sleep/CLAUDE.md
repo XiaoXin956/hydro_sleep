@@ -50,7 +50,7 @@ lib/
     models/device_parameters.dart - DeviceParameters（16个float参数，64字节LE）
     models/retransmit_record.dart - RetransmitRecord（12字节/组：序列号、时间戳、心率、呼吸率）
     models/retransmit30_record.dart - Retransmit30Record（15字节/组：分钟级记录）
-    models/report_summary.dart       - ReportSummary（26字节：startTime 4B **LE** / 其余 uint16 字段均 **BE**：totalSleepMinutes/sleepEfficiency/sleepQuality/turnOverCount/sleepLatencyMinutes/leaveBedCount/sleepRhythmPhase/reserved1/longestSleepStartMinute/ahiIndex/snoreTotalCount）
+    models/report_summary.dart       - ReportSummary（26字节：startTime 4B **LE** / 其余 uint16 字段均 **BE**，含 `dataLoaded` 字段标记0x14分钟数据是否已拉取）
     models/sleep_minute_record.dart  - SleepMinuteRecord（0x94: 4字节/组, 0x82: 15字节/组；字段：dateTime, status, heartRate, breathRate, bodyMovement, snoreCount, respiratoryObstruction, pthd, temp；工厂方法：fromBytes() 0x94, fromRetransmit30Bytes() 0x82）
   l10n/
     app_en.arb              - English translations (template)
@@ -60,7 +60,7 @@ lib/
     startup/startup_page.dart         - Splash screen (auto-navigate to /home after 2s)
     home/home_page.dart               - Tab shell (BottomNavigationBar, 3 tabs)
     index/index_page.dart             - Home tab content
-    index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard, WaterLevelCard（三态：未知/正常/异常 + 关机灰化）
+    index/widgets/                    - ConnectionStatusCard（含电源开关按钮）, RealtimeDataCard（0x85实时秒数据：时间/状态/心率/呼吸率）, ModeSelectionCard（自动/制冷/制热三模式）, TemperatureControlCard（滑块+预设+BLE发送）, ScheduleCard, WaterLevelCard（三态：未知/正常/异常 + 关机灰化）
     report/report_page.dart           - Sleep report (NestedScrollView + TabBar: Daily/Weekly/Monthly)
     report/widgets/                   - DateHeader, SleepScoreCard（评分环形+总时长+入睡起床时间+DB查询+动画过渡）, SleepStagesSummary（深睡/浅睡/REM/清醒百分比+时长，TweenAnimationBuilder 350ms，无数据显示"-"）, SleepTempCurve（Y轴0-50，左侧睡眠阶段=10/20/30/40，右侧温度°C，双线+整数tooltip，无数据显示"暂无数据"）, HeartRateChart（max/min/avg，Y轴20-220，6标签，无数据显示"暂无数据"）,
                                       RetransmitTestCard, Retransmit30TestCard, StopCommandTestCard, ModeCommandTestCard,
@@ -131,7 +131,7 @@ flutter run
   - 停止指令（0x03）→ 0x83：无内容
   - 工作模式设定（0x04）→ 0x84：确认字节（0x00/0x01/0x02/0x03/0x04）
   - 实时秒数据（0x05）→ 0x85：每秒12字节，同 RetransmitRecord 格式
-  - 实时分钟数据（0x06）→ 0x86：每分钟15字节，同 Retransmit30Record 格式
+  - 实时分钟数据（0x06）→ 0x86：每分钟15字节，`SleepMinuteRecord.fromBytesWithTime()` 解析并自动存入 Isar DB
   - 设备状态查询（0x07）→ 0x87：连接后自动发送，命令含 10 字节 MAC（4 字节 00 + 6 字节 remoteId）；响应 21 字节：bytes[4..13]=设备ID，[14]=模式，[15]=错误码（0x00=正常），[16..19]=Unix秒 BE，存储 `deviceId` 到 BleDataState
   - 心跳应答（0x08）→ 0x88：无内容
   - 压力校准（0x09）→ 0x89：结果字节（0x00=成功）

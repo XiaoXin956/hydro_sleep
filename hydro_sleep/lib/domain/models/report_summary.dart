@@ -14,8 +14,9 @@ class ReportSummary {
   final int longestSleepStartMinute; // 最长睡眠开始分钟点（0~1440）
   final int ahiIndex; // 呼吸障碍指数 AHI
   final int snoreTotalCount; // 打鼾总次数
+  bool dataLoaded; // 0x14 详细分钟数据是否已拉取
 
-  const ReportSummary({
+  ReportSummary({
     this.startTime,
     required this.totalSleepMinutes,
     required this.sleepEfficiency,
@@ -28,6 +29,7 @@ class ReportSummary {
     required this.longestSleepStartMinute,
     required this.ahiIndex,
     required this.snoreTotalCount,
+    this.dataLoaded = false,
   });
 
   bool get isValid => startTime != null && totalSleepMinutes > 0 && totalSleepMinutes != 0xFFFF;

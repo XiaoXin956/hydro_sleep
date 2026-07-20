@@ -702,25 +702,39 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
+  /// 0x14 单次请求超时（比通用超时短，避免卡顿）
+  static const _sleepDataReadTimeout = Duration(seconds: 5);
+
   /// 批量拉取某个报表的全部分钟数据（seq 0~47，顺序执行，每段完成后才拉取下一段）
   ///
   /// [startTime] 从 0x93 报表解析的开始时间（Unix 秒，小端序 4 字节）
   /// [onProgress] 可选进度回调 (当前序号, 总数48)
-  /// 返回全部记录列表，中途失败返回已拉取的部分数据
+  /// 提前终止：连续2次空数据则停止（设备可能只存了部分数据）
   Future<List<SleepMinuteRecord>> sendFullSleepDataReadCommand({
     required int startTime,
     void Function(int seq, int total)? onProgress,
   }) async {
     final allRecords = <SleepMinuteRecord>[];
+    var emptyCount = 0;
     for (var seq = 0; seq < 48; seq++) {
       onProgress?.call(seq, 48);
       debugPrint('[数据管理] 拉取存储数据 seq=$seq/47');
-      final records = await sendSleepDataReadCommand(startTime: startTime, seq: seq);
+      final records = await sendSleepDataReadCommand(
+        startTime: startTime,
+        seq: seq,
+        timeout: _sleepDataReadTimeout,
+      );
       if (records.isEmpty) {
-        debugPrint('[数据管理] seq=$seq 无数据或错误，停止拉取');
-        break;
+        emptyCount++;
+        debugPrint('[数据管理] seq=$seq 无数据（连续空$emptyCount次）');
+        if (emptyCount >= 2) {
+          debugPrint('[数据管理] 连续2次无数据，停止拉取');
+          break;
+        }
+      } else {
+        emptyCount = 0;
+        allRecords.addAll(records);
       }
-      allRecords.addAll(records);
     }
     debugPrint('[数据管理] 批量拉取完成: ${allRecords.length} 分钟');
     // 标记 dataLoaded

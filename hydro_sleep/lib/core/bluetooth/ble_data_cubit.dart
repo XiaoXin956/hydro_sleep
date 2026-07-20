@@ -715,8 +715,25 @@ class BleDataCubit extends Cubit<BleDataState> {
     void Function(int seq, int total)? onProgress,
   }) async {
     final allRecords = <SleepMinuteRecord>[];
+    final frameStartTime = DateTime.fromMillisecondsSinceEpoch(startTime * 1000);
+    final deviceId = _connectCubit.state.remoteId;
+
     for (var seq = 0; seq < 48; seq++) {
       onProgress?.call(seq, 48);
+      // 检查本地是否已有该段数据
+      final segStart = frameStartTime.add(Duration(minutes: seq * 30));
+      final segEnd = segStart.add(const Duration(minutes: 30));
+      if (deviceId != null) {
+        final exists = await SleepDataRepository.hasSleepMinuteData(
+          deviceId: deviceId,
+          start: segStart,
+          end: segEnd,
+        );
+        if (exists) {
+          debugPrint('[数据管理] seq=$seq 本地已存在，跳过');
+          continue;
+        }
+      }
       debugPrint('[数据管理] 拉取存储数据 seq=$seq/47');
       final records = await sendSleepDataReadCommand(
         startTime: startTime,
@@ -731,9 +748,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
     debugPrint('[数据管理] 批量拉取完成: ${allRecords.length} 分钟');
     // 标记 dataLoaded
-    final deviceId = _connectCubit.state.remoteId;
     if (deviceId != null && allRecords.isNotEmpty) {
-      final frameStartTime = DateTime.fromMillisecondsSinceEpoch(startTime * 1000);
       await SleepDataRepository.markDataLoaded(deviceId, frameStartTime);
     }
     return allRecords;

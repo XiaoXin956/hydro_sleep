@@ -169,6 +169,21 @@ class SleepDataRepository {
     return result;
   }
 
+  /// 查询指定时间范围内是否存在分钟数据
+  static Future<bool> hasSleepMinuteData({
+    required String deviceId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final db = await HydroSleepDatabase.getInstance();
+    final count = await db.sleepMinuteDatas
+        .filter()
+        .deviceIdEqualTo(deviceId)
+        .timestampBetween(start, end)
+        .count();
+    return count > 0;
+  }
+
   /// 查询所有分钟数据（调试用，不过滤 deviceId）
   static Future<List<SleepMinuteData>> getAllSleepMinuteData() async {
     final db = await HydroSleepDatabase.getInstance();

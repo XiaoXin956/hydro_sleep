@@ -115,21 +115,15 @@ class SleepDataRepository {
   /// 保存分钟级睡眠数据（按 deviceId+timestamp 去重覆盖）
   static Future<void> saveSleepMinuteData({
     required String deviceId,
-    required DateTime startTime,
-    required List<({int statusByte, int heartRate, int breathRate, int bodyMove})> groups,
+    required List<({int statusByte, int heartRate, int breathRate, int bodyMove, DateTime dateTime})> groups,
   }) async {
     final db = await HydroSleepDatabase.getInstance();
     final records = <SleepMinuteData>[];
 
-    for (var i = 0; i < groups.length; i++) {
-      final g = groups[i];
-      final ts = startTime.add(Duration(minutes: i));
-      // 去掉秒，只保留分钟精度
-      final minuteTs = DateTime(ts.year, ts.month, ts.day, ts.hour, ts.minute);
-
+    for (final g in groups) {
       final record = SleepMinuteData()
         ..deviceId = deviceId
-        ..timestamp = minuteTs
+        ..timestamp = g.dateTime
         ..status = SleepMinuteStatus.fromByte(g.statusByte).dbValue
         ..heartRate = g.heartRate
         ..breathRate = g.breathRate
@@ -139,7 +133,7 @@ class SleepDataRepository {
       final existing = await db.sleepMinuteDatas
           .filter()
           .deviceIdEqualTo(deviceId)
-          .timestampEqualTo(minuteTs)
+          .timestampEqualTo(g.dateTime)
           .findFirst();
       if (existing != null) {
         record.id = existing.id;

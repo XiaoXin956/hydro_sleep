@@ -172,7 +172,7 @@ class BleDataCubit extends Cubit<BleDataState> {
   DateTime _lastTempSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   static const _deviceInfoLength = 11;
-  static const _defaultTimeout = Duration(seconds: 15);
+  static const _defaultTimeout = Duration(seconds: 30);
   static const _headerDeviceByte1 = 0xA5;
   static const _headerDeviceByte2 = 0x5A;
   static const _headerCmd0x81 = 0x81;
@@ -702,6 +702,36 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
+  /// 批量拉取某个报表的全部分钟数据（seq 0~47，顺序执行，每段完成后才拉取下一段）
+  ///
+  /// [startTime] 从 0x93 报表解析的开始时间（Unix 秒，小端序 4 字节）
+  /// [onProgress] 可选进度回调 (当前序号, 总数48)
+  /// 返回全部记录列表，中途失败返回已拉取的部分数据
+  Future<List<SleepMinuteRecord>> sendFullSleepDataReadCommand({
+    required int startTime,
+    void Function(int seq, int total)? onProgress,
+  }) async {
+    final allRecords = <SleepMinuteRecord>[];
+    for (var seq = 0; seq < 48; seq++) {
+      onProgress?.call(seq, 48);
+      debugPrint('[数据管理] 拉取存储数据 seq=$seq/47');
+      final records = await sendSleepDataReadCommand(startTime: startTime, seq: seq);
+      if (records.isEmpty) {
+        debugPrint('[数据管理] seq=$seq 无数据或错误，停止拉取');
+        break;
+      }
+      allRecords.addAll(records);
+    }
+    debugPrint('[数据管理] 批量拉取完成: ${allRecords.length} 分钟');
+    // 标记 dataLoaded
+    final deviceId = _connectCubit.state.remoteId;
+    if (deviceId != null && allRecords.isNotEmpty) {
+      final frameStartTime = DateTime.fromMillisecondsSinceEpoch(startTime * 1000);
+      await SleepDataRepository.markDataLoaded(deviceId, frameStartTime);
+    }
+    return allRecords;
+  }
+
   /// 发送重传指令 0x01（过去 30 秒数据），等待设备回复 0x81 历史数据
   static const _retransmitCommand = [
     0x7D, 0x01, 0x0F, 0x00,
@@ -1044,12 +1074,12 @@ class BleDataCubit extends Cubit<BleDataState> {
         if (deviceId != null && record.dateTime != null) {
           unawaited(SleepDataRepository.saveSleepMinuteData(
             deviceId: deviceId,
-            startTime: record.dateTime!,
             groups: [(
               statusByte: record.status,
               heartRate: record.heartRate,
               breathRate: record.breathRate,
               bodyMove: record.bodyMovement,
+              dateTime: record.dateTime!,
             )],
           ));
         }
@@ -1231,8 +1261,8 @@ class BleDataCubit extends Cubit<BleDataState> {
       final frameLen = buf[2] | (buf[3] << 8);
       // ID bytes[4..13]（10字节 ASCII）
       final asciiId = String.fromCharCodes(buf.sublist(4, 14));
-      // 开始时间 bytes[14..17] 大端序
-      final timeRaw = (buf[14] << 24) | (buf[15] << 16) | (buf[16] << 8) | buf[17];
+      // 开始时间 bytes[14..17] 小端序
+      final timeRaw = buf[14] | (buf[15] << 8) | (buf[16] << 16) | (buf[17] << 24);
       // 序列号 bytes[18]
       final seq = buf[18];
 
@@ -1246,8 +1276,8 @@ class BleDataCubit extends Cubit<BleDataState> {
         return;
       }
 
-      final startTime = DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000);
-      debugPrint('[数据管理] 0x94 起始时间=$startTime, 序号=$seq');
+      final frameStartTime = DateTime.fromMillisecondsSinceEpoch(timeRaw * 1000);
+      debugPrint('[数据管理] 0x94 起始时间=$frameStartTime, 序号=$seq');
 
       // 数据组从 bytes[19] 到 bytes[N-2]（去掉末尾 0x0D）
       final dataStart = 19;
@@ -1264,16 +1294,20 @@ class BleDataCubit extends Cubit<BleDataState> {
       }
 
       final records = <SleepMinuteRecord>[];
-      final dbGroups = <({int statusByte, int heartRate, int breathRate, int bodyMove})>[];
+      final dbGroups = <({int statusByte, int heartRate, int breathRate, int bodyMove, DateTime dateTime})>[];
       for (var i = 0; i < groupCount; i++) {
         final offset = dataStart + i * 4;
-        final record = SleepMinuteRecord.fromBytes(buf, offset);
+        final record = SleepMinuteRecord.from94Bytes(buf, offset);
+        // dateTime = 帧开始时间 + (序号 × 30 + 组内序号) 分钟，秒归零
+        final dt = frameStartTime.add(Duration(minutes: seq * 30 + i));
+        final minuteDt = DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute);
         records.add(record);
         dbGroups.add((
           statusByte: record.status,
           heartRate: record.heartRate,
           breathRate: record.breathRate,
           bodyMove: record.bodyMovement,
+          dateTime: minuteDt,
         ));
       }
 
@@ -1285,11 +1319,10 @@ class BleDataCubit extends Cubit<BleDataState> {
 
       // 存入 DB
       final deviceId = _connectCubit.state.remoteId;
-      debugPrint('[数据管理] 0x94 准备存DB: deviceId=$deviceId, startTime=$startTime');
+      debugPrint('[数据管理] 0x94 准备存DB: deviceId=$deviceId, startTime=$frameStartTime');
       if (deviceId != null) {
         unawaited(SleepDataRepository.saveSleepMinuteData(
           deviceId: deviceId,
-          startTime: startTime,
           groups: dbGroups,
         ));
       }

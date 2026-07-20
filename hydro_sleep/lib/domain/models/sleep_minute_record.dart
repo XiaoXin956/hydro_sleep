@@ -49,7 +49,7 @@ class SleepMinuteRecord {
   });
 
   /// 从 0x94 数据 4 字节解析（不含额外字段）
-  factory SleepMinuteRecord.fromBytes(List<int> bytes, int offset) {
+  factory SleepMinuteRecord.from94Bytes(List<int> bytes, int offset) {
     return SleepMinuteRecord(
       status: bytes[offset],
       heartRate: bytes[offset + 1],

@@ -75,7 +75,7 @@ class _SleepMinuteDataTestCardState extends State<SleepMinuteDataTestCard> {
     int totalMinutes = 0;
     for (final dayStart in days) {
       final startTime = DateTime(dayStart.year, dayStart.month, dayStart.day, 23, 0);
-      final groups = <({int statusByte, int heartRate, int breathRate, int bodyMove})>[];
+      final groups = <({int statusByte, int heartRate, int breathRate, int bodyMove, DateTime dateTime})>[];
       for (var m = 0; m < 480; m++) {
         final int statusByte;
         final int hr; final int br; final int mv;
@@ -116,10 +116,13 @@ class _SleepMinuteDataTestCardState extends State<SleepMinuteDataTestCard> {
             statusByte = 0x11; hr = 50 + rng.nextInt(10); br = 11 + rng.nextInt(4); mv = rng.nextInt(2);
           }
         }
-        groups.add((statusByte: statusByte, heartRate: hr, breathRate: br, bodyMove: mv));
+        groups.add((
+          statusByte: statusByte, heartRate: hr, breathRate: br, bodyMove: mv,
+          dateTime: startTime.add(Duration(minutes: m)),
+        ));
       }
       await SleepDataRepository.saveSleepMinuteData(
-        deviceId: deviceId, startTime: startTime, groups: groups,
+        deviceId: deviceId, groups: groups,
       );
       totalMinutes += groups.length;
     }

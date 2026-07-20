@@ -1217,8 +1217,17 @@ class BleDataCubit extends Cubit<BleDataState> {
               deviceId: deviceId,
               asciiId: _lastReportAsciiId,
               summaries: List.unmodifiable(_reportBuffer),
-            ).then((_) {
+            ).then((_) async {
               debugPrint('[数据管理] 报表已自动保存到数据库: ${_reportBuffer.length} 条');
+              // 自动拉取第一条未读取过的报表的分钟数据
+              final firstUnread = _reportBuffer
+                  .where((s) => s.isValid && !s.dataLoaded)
+                  .firstOrNull;
+              if (firstUnread != null && firstUnread.startTime != null) {
+                final startUnix = firstUnread.startTime!.millisecondsSinceEpoch ~/ 1000;
+                debugPrint('[数据管理] 自动拉取分钟数据: startTime=${firstUnread.startTime}');
+                await sendFullSleepDataReadCommand(startTime: startUnix);
+              }
             }).catchError((e) {
               debugPrint('[数据管理] 报表保存数据库失败: $e');
             });

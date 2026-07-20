@@ -715,7 +715,6 @@ class BleDataCubit extends Cubit<BleDataState> {
     void Function(int seq, int total)? onProgress,
   }) async {
     final allRecords = <SleepMinuteRecord>[];
-    var emptyCount = 0;
     for (var seq = 0; seq < 48; seq++) {
       onProgress?.call(seq, 48);
       debugPrint('[数据管理] 拉取存储数据 seq=$seq/47');
@@ -725,14 +724,8 @@ class BleDataCubit extends Cubit<BleDataState> {
         timeout: _sleepDataReadTimeout,
       );
       if (records.isEmpty) {
-        emptyCount++;
-        debugPrint('[数据管理] seq=$seq 无数据（连续空$emptyCount次）');
-        if (emptyCount >= 2) {
-          debugPrint('[数据管理] 连续2次无数据，停止拉取');
-          break;
-        }
+        debugPrint('[数据管理] seq=$seq 无数据，跳过');
       } else {
-        emptyCount = 0;
         allRecords.addAll(records);
       }
     }

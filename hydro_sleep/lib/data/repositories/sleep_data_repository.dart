@@ -250,4 +250,49 @@ class SleepDataRepository {
     await db.writeTxn(() => db.temperatureRecords.clear());
     return count;
   }
+
+  // ── 数据清理 ──
+
+  /// 保留期限（6个月）
+  static const _retentionMonths = 6;
+
+  /// 清理超过 6 个月的过期数据（报表 + 分钟数据 + 温度记录）
+  static Future<void> cleanupOldData() async {
+    final db = await HydroSleepDatabase.getInstance();
+    final cutoff = DateTime.now().subtract(const Duration(days: 30 * _retentionMonths));
+    debugPrint('[数据管理] 清理 ${cutoff.toIso8601String()} 之前的数据');
+
+    // 清理过期报表
+    final oldReports = await db.reportSummaryRecords
+        .filter()
+        .startTimeLessThan(cutoff)
+        .findAll();
+    if (oldReports.isNotEmpty) {
+      await db.writeTxn(() => db.reportSummaryRecords
+          .deleteAll(oldReports.map((r) => r.id).toList()));
+      debugPrint('[数据管理] 已清理 ${oldReports.length} 条过期报表');
+    }
+
+    // 清理过期分钟数据
+    final oldMinutes = await db.sleepMinuteDatas
+        .filter()
+        .timestampLessThan(cutoff)
+        .findAll();
+    if (oldMinutes.isNotEmpty) {
+      await db.writeTxn(() => db.sleepMinuteDatas
+          .deleteAll(oldMinutes.map((r) => r.id).toList()));
+      debugPrint('[数据管理] 已清理 ${oldMinutes.length} 条过期分钟数据');
+    }
+
+    // 清理过期温度记录
+    final oldTemps = await db.temperatureRecords
+        .filter()
+        .timestampLessThan(cutoff)
+        .findAll();
+    if (oldTemps.isNotEmpty) {
+      await db.writeTxn(() => db.temperatureRecords
+          .deleteAll(oldTemps.map((r) => r.id).toList()));
+      debugPrint('[数据管理] 已清理 ${oldTemps.length} 条过期温度记录');
+    }
+  }
 }

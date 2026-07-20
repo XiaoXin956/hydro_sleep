@@ -1241,6 +1241,8 @@ class BleDataCubit extends Cubit<BleDataState> {
               summaries: List.unmodifiable(_reportBuffer),
             ).then((_) async {
               debugPrint('[数据管理] 报表已自动保存到数据库: ${_reportBuffer.length} 条');
+              // 清理超过 6 个月的过期数据
+              unawaited(SleepDataRepository.cleanupOldData());
               // 自动拉取第一条未读取过的报表的分钟数据
               final firstUnread = _reportBuffer
                   .where((s) => s.isValid && !s.dataLoaded)

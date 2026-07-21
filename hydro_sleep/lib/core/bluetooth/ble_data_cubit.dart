@@ -168,6 +168,9 @@ class BleDataCubit extends Cubit<BleDataState> {
   Completer<List<SleepMinuteRecord>>? _sleepDataCompleter;
   List<int> _sleepDataBuffer = [];
 
+  // 批量拉取状态（0x14 seq 0~47 逐段请求）
+  _BatchSleepData? _batchSleepData;
+
   // 温度存储节流（每 10 秒存一条）
   DateTime _lastTempSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -705,53 +708,61 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 0x14 单次请求超时（比通用超时短，避免卡顿）
   static const _sleepDataReadTimeout = Duration(seconds: 5);
 
-  /// 批量拉取某个报表的全部分钟数据（seq 0~47，顺序执行，每段完成后才拉取下一段）
+  /// 批量拉取某个报表的全部分钟数据（seq 0~47，收到 0x94 响应后自动请求下一段）
   ///
   /// [startTime] 从 0x93 报表解析的开始时间（Unix 秒，小端序 4 字节）
   /// [onProgress] 可选进度回调 (当前序号, 总数48)
-  /// 提前终止：连续2次空数据则停止（设备可能只存了部分数据）
-  Future<List<SleepMinuteRecord>> sendFullSleepDataReadCommand({
+  Future<void> sendFullSleepDataReadCommand({
     required int startTime,
     void Function(int seq, int total)? onProgress,
   }) async {
-    final allRecords = <SleepMinuteRecord>[];
-    final frameStartTime = DateTime.fromMillisecondsSinceEpoch(startTime * 1000);
     final deviceId = _connectCubit.state.remoteId;
+    if (deviceId == null) {
+      debugPrint('[数据管理] sendFullSleepDataReadCommand 失败: 无 deviceId');
+      return;
+    }
+    _batchSleepData = _BatchSleepData(
+      deviceId: deviceId,
+      startTime: startTime,
+      nextSeq: 0,
+      onProgress: onProgress,
+    );
+    _sendNextBatchSeq();
+  }
 
-    for (var seq = 0; seq < 48; seq++) {
-      onProgress?.call(seq, 48);
-      // 检查本地是否已有该段数据
-      final segStart = frameStartTime.add(Duration(minutes: seq * 30));
-      final segEnd = segStart.add(const Duration(minutes: 30));
-      if (deviceId != null) {
-        final exists = await SleepDataRepository.hasSleepMinuteData(
-          deviceId: deviceId,
-          start: segStart,
-          end: segEnd,
-        );
-        if (exists) {
-          debugPrint('[数据管理] seq=$seq 本地已存在，跳过');
-          continue;
-        }
+  /// 发送批量拉取的下一段请求（由 0x94 handler 或初始化时调用）
+  Future<void> _sendNextBatchSeq() async {
+    final batch = _batchSleepData;
+    if (batch == null) return;
+
+    final seq = batch.nextSeq;
+    if (seq >= 48) {
+      debugPrint('[数据管理] 批量拉取完成: ${batch.totalRecords} 分钟');
+      final frameStartTime = DateTime.fromMillisecondsSinceEpoch(batch.startTime * 1000);
+      if (batch.totalRecords > 0) {
+        await SleepDataRepository.markDataLoaded(batch.deviceId, frameStartTime);
       }
-      debugPrint('[数据管理] 拉取存储数据 seq=$seq/47');
-      final records = await sendSleepDataReadCommand(
-        startTime: startTime,
-        seq: seq,
-        timeout: _sleepDataReadTimeout,
-      );
-      if (records.isEmpty) {
-        debugPrint('[数据管理] seq=$seq 无数据，跳过');
-      } else {
-        allRecords.addAll(records);
+      _batchSleepData = null;
+      return;
+    }
+
+    batch.onProgress?.call(seq, 48);
+    debugPrint('[数据管理] 拉取存储数据 seq=$seq/47');
+    // 超时保护：如果 5s 内 0x94 未响应，自动继续下一段
+    _batchSleepData!.timeoutTimer = Timer(_sleepDataReadTimeout, () {
+      if (_batchSleepData == batch) {
+        debugPrint('[数据管理] seq=$seq 超时，继续下一段');
+        _batchSleepData!.nextSeq = seq + 1;
+        _batchSleepData!.timeoutTimer = null;
+        _sendNextBatchSeq();
       }
-    }
-    debugPrint('[数据管理] 批量拉取完成: ${allRecords.length} 分钟');
-    // 标记 dataLoaded
-    if (deviceId != null && allRecords.isNotEmpty) {
-      await SleepDataRepository.markDataLoaded(deviceId, frameStartTime);
-    }
-    return allRecords;
+    });
+    // 发送命令（不 await，0x94 handler 收到数据后会触发下一段）
+    sendSleepDataReadCommand(
+      startTime: batch.startTime,
+      seq: seq,
+      timeout: _sleepDataReadTimeout,
+    );
   }
 
   /// 发送重传指令 0x01（过去 30 秒数据），等待设备回复 0x81 历史数据
@@ -1306,6 +1317,13 @@ class BleDataCubit extends Cubit<BleDataState> {
         if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
           _sleepDataCompleter!.complete([]);
         }
+        // 批量拉取：取消超时定时器，错误也继续下一段
+        if (_batchSleepData != null) {
+          _batchSleepData!.timeoutTimer?.cancel();
+          _batchSleepData!.timeoutTimer = null;
+          _batchSleepData!.nextSeq = _batchSleepData!.nextSeq + 1;
+          _sendNextBatchSeq();
+        }
         return;
       }
 
@@ -1363,6 +1381,15 @@ class BleDataCubit extends Cubit<BleDataState> {
       if (_sleepDataCompleter != null && !_sleepDataCompleter!.isCompleted) {
         _sleepDataCompleter!.complete(records);
       }
+
+      // 批量拉取：取消超时定时器，触发下一段
+      if (_batchSleepData != null) {
+        _batchSleepData!.timeoutTimer?.cancel();
+        _batchSleepData!.timeoutTimer = null;
+        _batchSleepData!.totalRecords += records.length;
+        _batchSleepData!.nextSeq = seq + 1;
+        _sendNextBatchSeq();
+      }
     } else {
       // 未知数据类型：未匹配到已知帧头
       debugPrint('[数据管理] 未知数据类型 bytes[1]=0x${bytes.length >= 2 ? bytes[1].toRadixString(16) : '??'}: $bytes');
@@ -1374,6 +1401,8 @@ class BleDataCubit extends Cubit<BleDataState> {
     debugPrint('[数据管理] 停止数据流');
     _dataSub?.cancel();
     _dataSub = null;
+    _batchSleepData?.timeoutTimer?.cancel();
+    _batchSleepData = null;
     if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
       _responseCompleter!.complete(false);
     }
@@ -1436,4 +1465,21 @@ class BleDataCubit extends Cubit<BleDataState> {
     _bleService.clearCharacteristicCache();
     return super.close();
   }
+}
+
+/// 批量拉取睡眠分钟数据的运行状态
+class _BatchSleepData {
+  final String deviceId;
+  final int startTime; // Unix 秒
+  int nextSeq; // 下一个要请求的序号（0~47）
+  int totalRecords = 0;
+  Timer? timeoutTimer; // 超时保护定时器
+  final void Function(int seq, int total)? onProgress;
+
+  _BatchSleepData({
+    required this.deviceId,
+    required this.startTime,
+    required this.nextSeq,
+    this.onProgress,
+  });
 }

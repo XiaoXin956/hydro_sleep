@@ -400,7 +400,7 @@ class BleDataCubit extends Cubit<BleDataState> {
       );
 
       // 连接成功后自动查询固件版本
-      sendFirmwareVersionCommand();
+      await sendFirmwareVersionCommand();
       // 连接成功后自动查询设备状态（带 MAC 的 0x07）
       sendDeviceStatusCommand();
     } catch (e) {

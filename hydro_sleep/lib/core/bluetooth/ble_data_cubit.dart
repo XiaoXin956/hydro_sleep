@@ -705,8 +705,8 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
-  /// 0x14 单次请求超时（比通用超时短，避免卡顿）
-  static const _sleepDataReadTimeout = Duration(seconds: 5);
+  /// 0x14 单次请求超时
+  static const _sleepDataReadTimeout = Duration(minutes: 1);
 
   /// 批量拉取某个报表的全部分钟数据（seq 0~47，收到 0x94 响应后自动请求下一段）
   ///

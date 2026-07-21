@@ -10,10 +10,12 @@ class DateHeader extends StatefulWidget {
     super.key,
     required this.period,
     this.onPeriodChanged,
+    this.onRefresh,
   });
 
   final DatePeriod period;
   final ValueChanged<DateTime>? onPeriodChanged;
+  final VoidCallback? onRefresh;
 
   @override
   State<DateHeader> createState() => _DateHeaderState();
@@ -155,8 +157,12 @@ class _DateHeaderState extends State<DateHeader> {
     final text = _displayText(AppLocalizations.of(context)!);
 
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        // 左侧占位，保持居中对称
+        if (widget.onRefresh != null)
+          const SizedBox(width: 48)
+        else
+          const Spacer(),
         IconButton(
           icon: const Icon(Icons.chevron_left, size: 28),
           onPressed: _previous,
@@ -168,8 +174,8 @@ class _DateHeaderState extends State<DateHeader> {
           switchOutCurve: Curves.easeIn,
           transitionBuilder: (child, anim) {
             final offset = child.key == ValueKey(text)
-                ? Offset(_direction * 0.4, 0)   // 新文字：从方向侧滑入
-                : Offset(-_direction * 0.4, 0);  // 旧文字：向方向侧滑出
+                ? Offset(_direction * 0.4, 0)
+                : Offset(-_direction * 0.4, 0);
             return SlideTransition(
               position: Tween(begin: offset, end: Offset.zero).animate(anim),
               child: FadeTransition(opacity: anim, child: child),
@@ -190,6 +196,14 @@ class _DateHeaderState extends State<DateHeader> {
           ),
           onPressed: _canGoNext ? _next : null,
         ),
+        // 右侧刷新按钮
+        if (widget.onRefresh != null)
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 22),
+            onPressed: widget.onRefresh,
+          )
+        else
+          const Spacer(),
       ],
     );
   }

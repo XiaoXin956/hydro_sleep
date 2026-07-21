@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
@@ -54,6 +55,9 @@ class _DailyReportBody extends StatelessWidget {
                   period: DatePeriod.day,
                   onPeriodChanged: (date) {
                     context.read<DailyReportCubit>().selectDate(date);
+                  },
+                  onRefresh: () {
+                    context.read<BleDataCubit>().sendReportQueryCommand();
                   },
                 ),
                 const SizedBox(height: 4),

@@ -215,15 +215,11 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const modeMonitor = 0x20;
   static const modeDebug = 0x30;
 
-  /// 构建带真实 MAC 的 0x07 命令帧
-  /// remoteId 格式 "98:DA:10:06:95:C0" → [98 DA 10 06 95 C0]
-  /// ID 10 字节，前面补 00: 00 00 00 00 98 DA 10 06 95 C0
+  /// 0x07 命令帧（默认 ID: UNCONFIGURED）
   List<int> _buildDeviceStatusCommand(String remoteId) {
-    final macParts = remoteId.split(':').map((s) => int.parse(s, radix: 16)).toList();
-    final idBytes = [0x00, 0x00, 0x00, 0x00, ...macParts]; // 4+6=10 bytes
     return [
       0x7D, 0x07, 0x0F, 0x00,
-      ...idBytes,
+      0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
       0x0D,
     ];
   }
@@ -252,14 +248,9 @@ class BleDataCubit extends Cubit<BleDataState> {
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
   ];
 
-  /// 构建设备存储报表查询 0x13 命令，ID 从本地缓存读取
-  Future<List<int>> _buildReportQueryCommand() async {
-    final remoteId = _connectCubit.state.remoteId;
-    final asciiId = remoteId != null
-        ? await _secureStorage.getDeviceAsciiId(remoteId)
-        : null;
-    final id = asciiId ?? [0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44];
-    return [0x7D, 0x13, 0x0F, 0x00, ...id, 0x0D];
+  /// 构建设备存储报表查询 0x13 命令（默认 ID: UNCONFIGURED）
+  List<int> _buildReportQueryCommand() {
+    return [0x7D, 0x13, 0x0F, 0x00, 0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D];
   }
 
   /// 写入数据并记录发送日志
@@ -635,7 +626,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _lastReportAsciiId = '';
     emit(state.copyWith(reportQueryLoading: true));
     try {
-      final cmd = await _buildReportQueryCommand();
+      final cmd = _buildReportQueryCommand();
       await _writeWithLog(cmd);
       debugPrint('[数据管理] 报表查询已发送，等待 0x93 响应...');
       final result = await _reportQueryCompleter!.future.timeout(
@@ -673,15 +664,9 @@ class BleDataCubit extends Cubit<BleDataState> {
 
     _sleepDataCompleter = Completer<List<SleepMinuteRecord>>();
 
-    final remoteId = _connectCubit.state.remoteId;
-    final asciiId = remoteId != null
-        ? await _secureStorage.getDeviceAsciiId(remoteId)
-        : null;
-    final id = asciiId ?? [0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44];
-
     final cmd = [
       0x7D, 0x14, 0x14, 0x00,
-      ...id,
+      0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
       startTime & 0xFF, (startTime >> 8) & 0xFF,
       (startTime >> 16) & 0xFF, (startTime >> 24) & 0xFF,
       seq,
@@ -1137,11 +1122,6 @@ class BleDataCubit extends Cubit<BleDataState> {
           lastReceived: bytes,
           rawLog: log,
         ));
-        // 保存 asciiId 到本地，key 为当前连接的 remoteId
-        final remoteId = _connectCubit.state.remoteId;
-        if (remoteId != null && status.asciiId.isNotEmpty) {
-          unawaited(_secureStorage.saveDeviceAsciiId(remoteId, status.asciiId));
-        }
         if (_deviceStatusCompleter != null && !_deviceStatusCompleter!.isCompleted) {
           _deviceStatusCompleter!.complete(status);
         }

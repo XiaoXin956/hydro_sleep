@@ -12,6 +12,7 @@ import 'package:hydro_sleep/presentation/report/widgets/retransmit_test_card.dar
 import 'package:hydro_sleep/presentation/report/widgets/retransmit30_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/stop_command_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/mode_command_test_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/init_command_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/device_status_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/heartbeat_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/pressure_calibrate_test_card.dart';
@@ -77,6 +78,8 @@ class _DailyReportBody extends StatelessWidget {
                 const SizedBox(height: 16),
                 const ModeCommandTestCard(),
                 const SizedBox(height: 16),
+                const InitCommandTestCard(),
+                const SizedBox(height: 16),
                 const DeviceStatusTestCard(),
                 const SizedBox(height: 16),
                 const HeartbeatTestCard(),
@@ -101,7 +104,7 @@ class _DailyReportBody extends StatelessWidget {
                 const SizedBox(height: 40),
               ];
               return items[index];
-            }, childCount: 40),
+            }, childCount: 42),
           ),
         ),
       ],

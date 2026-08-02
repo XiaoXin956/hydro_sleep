@@ -215,6 +215,13 @@ class BleDataCubit extends Cubit<BleDataState> {
   static const modeMonitor = 0x20;
   static const modeDebug = 0x30;
 
+  /// 初始化指令 0x04（监控模式 0x20）: 7D 04 10 00 UNCONFIGED 20 0D
+  static const initCommand = [
+    0x7D, 0x04, 0x10, 0x00,
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+    0x20, 0x0D,
+  ];
+
   /// 0x07 命令帧（默认 ID: UNCONFIGURED）
   List<int> _buildDeviceStatusCommand(String remoteId) {
     return [
@@ -242,9 +249,9 @@ class BleDataCubit extends Cubit<BleDataState> {
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
   ];
 
-  /// 校准时钟指令 0x0B 前缀（14 字节：7D 0B 10 00 ... 44 [4字节时间LE] 0D）
+  /// 校准时钟指令 0x0B 前缀（14 字节：7D 0B 13 00 ... 44 [4字节时间LE] 0D，整帧 19 字节）
   static const _clockCalibratePrefix = [
-    0x7D, 0x0B, 0x10, 0x00,
+    0x7D, 0x0B, 0x13, 0x00,
     0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
   ];
 
@@ -394,9 +401,9 @@ class BleDataCubit extends Cubit<BleDataState> {
       );
 
       // 连接成功后自动查询固件版本
-      await sendFirmwareVersionCommand();
+      // await sendFirmwareVersionCommand();
       // 连接成功后自动查询设备状态（带 MAC 的 0x07）
-      sendDeviceStatusCommand();
+      // sendDeviceStatusCommand();
     } catch (e) {
       debugPrint('[数据管理] 启动数据流失败: $e');
       emit(state.copyWith(status: BleDataStatus.error, error: '$e'));
@@ -427,6 +434,23 @@ class BleDataCubit extends Cubit<BleDataState> {
       return false;
     } finally {
       _responseCompleter = null;
+    }
+  }
+
+  /// 发送初始化指令 0x04（监控模式 0x20），不等待 0x84 响应
+  /// 仅判断是否已连接（streaming 状态），已连接则直接发送，默认成功
+  Future<bool> sendInitCommand() async {
+    if (state.status != BleDataStatus.streaming) {
+      debugPrint('[数据管理] sendInitCommand 失败: 未处于 streaming 状态');
+      return false;
+    }
+    try {
+      await _writeWithLog(initCommand);
+      debugPrint('[数据管理] 初始化指令已发送（不等待响应）');
+      return true;
+    } catch (e) {
+      debugPrint('[数据管理] sendInitCommand 异常: $e');
+      return false;
     }
   }
 
@@ -590,14 +614,16 @@ class BleDataCubit extends Cubit<BleDataState> {
     return sendCommand(cmd, timeout: timeout);
   }
 
-  /// 校准时钟 0x0B，发送当前时间，设备更新时钟并返回 0x8B
+  /// 校准时钟 0x0B，发送当前时间（UTC 时区），设备更新时钟并返回 0x8B
+  /// 帧格式: 7D 0B 13 00 UNCONFIGED [4字节 Unix 时间戳 LE] 0D（共 19 字节）
   /// 可选传入指定时间，默认使用当前系统时间
-  Future<bool> sendCalibrateClockCommand({
+  /// 返回发送的时间、十进制时间戳与完整帧数据（用于 UI 展示）
+  Future<({bool ok, DateTime time, int epoch, List<int> frame})> sendCalibrateClockCommand({
     DateTime? time,
     Duration timeout = _defaultTimeout,
   }) async {
-    if (state.status != BleDataStatus.streaming) return false;
-    final t = time ?? DateTime.now();
+    final ok = state.status == BleDataStatus.streaming;
+    final t = (time ?? DateTime.now()).toUtc();
     final epoch = t.millisecondsSinceEpoch ~/ 1000;
     final timeBytes = [
       epoch & 0xFF,
@@ -605,9 +631,11 @@ class BleDataCubit extends Cubit<BleDataState> {
       (epoch >> 16) & 0xFF,
       (epoch >> 24) & 0xFF,
     ];
-    final cmd = [..._clockCalibratePrefix, ...timeBytes, 0x0D];
-    debugPrint('[数据管理] 校准时钟: epoch=$epoch');
-    return sendCommand(cmd, timeout: timeout);
+    final frame = [..._clockCalibratePrefix, ...timeBytes, 0x0D];
+    debugPrint('[数据管理] 校准时钟: epoch=$epoch frame=${frame.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
+    if (!ok) return (ok: false, time: t, epoch: epoch, frame: frame);
+    final sent = await sendCommand(frame, timeout: timeout);
+    return (ok: sent, time: t, epoch: epoch, frame: frame);
   }
 
   /// 发送设备存储报表查询 0x13，等待设备回复 3 批 0x93 数据（共 15 组报表概要）

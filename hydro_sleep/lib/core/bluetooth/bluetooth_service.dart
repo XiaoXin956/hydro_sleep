@@ -121,6 +121,7 @@ class BleService {
           '[蓝牙服务]     Char: ${c.uuid} '
           'read=${c.properties.read} '
           'write=${c.properties.write} '
+          'writeWithoutResponse=${c.properties.writeWithoutResponse} '
           'notify=${c.properties.notify} '
           'indicate=${c.properties.indicate}',
         );
@@ -149,15 +150,18 @@ class BleService {
   }
 
   /// 找到第一个支持 Write 的特征值并缓存
+  /// 兼容 write（带响应）和 writeWithoutResponse（无响应）两种属性
   BluetoothCharacteristic? findWriteCharacteristic(
     List<BluetoothService> services,
   ) {
     for (final s in services) {
       for (final c in s.characteristics) {
-        if (c.properties.write) {
+        if (c.properties.write || c.properties.writeWithoutResponse) {
           _writeChar = c;
           debugPrint(
-            '[蓝牙服务] 找到 Write 特征值: ${c.uuid} (service: ${s.uuid})',
+            '[蓝牙服务] 找到 Write 特征值: ${c.uuid} (service: ${s.uuid}) '
+            'write=${c.properties.write} '
+            'writeWithoutResponse=${c.properties.writeWithoutResponse}',
           );
           return c;
         }
@@ -168,16 +172,20 @@ class BleService {
   }
 
   /// 向写特征值发送数据
+  /// 仅支持 writeWithoutResponse 时用无响应写入，否则用带响应写入
   Future<void> writeData(List<int> data) async {
     final char = _writeChar;
     if (char == null) {
       debugPrint('[蓝牙服务] writeData 失败: 未找到写特征值');
       throw Exception('未找到写特征值');
     }
+    final withoutResponse =
+        !char.properties.write && char.properties.writeWithoutResponse;
     debugPrint(
-      '[蓝牙服务] 写入数据: ${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+      '[蓝牙服务] 写入数据 (withoutResponse=$withoutResponse): '
+      '${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
     );
-    await char.write(data, withoutResponse: false);
+    await char.write(data, withoutResponse: withoutResponse);
   }
 
   /// 开启 Notify

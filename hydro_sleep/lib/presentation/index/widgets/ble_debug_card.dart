@@ -32,7 +32,7 @@ class BleDebugCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '${rawLog.length}/200',
+                    '${rawLog.length}/1000',
                     style: const TextStyle(
                       color: AppColors.textHint,
                       fontSize: 11,

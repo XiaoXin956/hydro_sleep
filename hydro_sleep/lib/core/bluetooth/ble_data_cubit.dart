@@ -163,6 +163,8 @@ class BleDataCubit extends Cubit<BleDataState> {
   List<ReportSummary> _reportBuffer = [];
   int _reportBatchReceived = 0;
   String _lastReportAsciiId = '';
+  // 0x93 帧重组缓冲：分包接收时暂存当前帧，重组后记录完整帧日志
+  List<int> _report93FrameBuffer = [];
 
   // 存储数据读取相关（0x14/0x94）
   Completer<List<SleepMinuteRecord>>? _sleepDataCompleter;
@@ -333,6 +335,7 @@ class BleDataCubit extends Cubit<BleDataState> {
       _parametersCompleter = null;
       _reportBuffer = [];
       _reportBatchReceived = 0;
+      _report93FrameBuffer = [];
       if (_reportQueryCompleter != null && !_reportQueryCompleter!.isCompleted) {
         _reportQueryCompleter!.complete([]);
       }
@@ -927,7 +930,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
-  static const _maxLogEntries = 200;
+  static const _maxLogEntries = 1000;
 
   void _onDataReceived(List<int> bytes) {
     final remoteId = _connectCubit.state.remoteId;
@@ -950,6 +953,31 @@ class BleDataCubit extends Cubit<BleDataState> {
     final log = List<String>.from(state.rawLog)..add(logEntry);
     if (log.length > _maxLogEntries) {
       log.removeAt(0);
+    }
+
+    // 0x93 帧重组：一帧可能被拆成多个 notify 包（MTU 限制），
+    // 首包以 7D 93 开头，后续为数据续包；重组后每帧记录一行完整日志
+    if (bytes.length >= 2 && bytes[0] == 0x7D && bytes[1] == _headerCmd0x93) {
+      // 新帧开始，若上一帧未以 0x0D 结束（中间批次），先补记上一帧
+      if (_report93FrameBuffer.isNotEmpty) {
+        log.add(_format93FrameLog(time, _report93FrameBuffer));
+        if (log.length > _maxLogEntries) {
+          log.removeAt(0);
+        }
+      }
+      _report93FrameBuffer = List.of(bytes);
+    } else if (_report93FrameBuffer.isNotEmpty) {
+      // 0x93 帧的续包
+      _report93FrameBuffer.addAll(bytes);
+    }
+
+    // 帧以 0x0D 结尾（仅末尾批次），记录完整帧
+    if (_report93FrameBuffer.isNotEmpty && _report93FrameBuffer.last == 0x0D) {
+      log.add(_format93FrameLog(time, _report93FrameBuffer));
+      if (log.length > _maxLogEntries) {
+        log.removeAt(0);
+      }
+      _report93FrameBuffer = [];
     }
 
     // 按 bytes[1] 数据类型分发（bytes[0] 为帧头）
@@ -1225,8 +1253,9 @@ class BleDataCubit extends Cubit<BleDataState> {
       }
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x93) {
       // 0x93：设备存储报表查询响应，命令 0x13 触发
-      // 帧结构：7D 93 [长度2B LE] [UNCONFIGED 10B] [序号1B] [5组×26B] 0D
-      // 设备分 3 批发送（间隔 300ms），序号 = 0/1/2
+      // 帧结构：7D 93 [长度2B LE] [UNCONFIGED 10B] [序号1B] [记录 N×26B] [0D仅末尾批]
+      // 硬件已调整：每次 notify 返回完整数据（可能一次包含全部记录），
+      // 按实际字节数解析全部组，不再固定每批 5 组
       if (bytes.length >= 28) {
         // 提取 ASCII ID（bytes[4..13]）
         _lastReportAsciiId = String.fromCharCodes(bytes.sublist(4, 14));
@@ -1235,10 +1264,13 @@ class BleDataCubit extends Cubit<BleDataState> {
         final frameHex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
         debugPrint('[数据管理] 0x93 报表批次 $seq/2，${bytes.length}字节，asciiId=$_lastReportAsciiId');
         debugPrint('[数据管理] 0x93 帧原始数据: $frameHex');
-        // 解析本批 5 组 × 26 字节（bytes[14] 开始）
-        for (var i = 0; i < 5; i++) {
+        // 数据区从 bytes[14] 开始，末尾 0x0D 结束符不计入
+        final dataEnd = bytes.last == 0x0D ? bytes.length - 1 : bytes.length;
+        final groupCount = (dataEnd - 14) ~/ 26;
+        debugPrint('[数据管理] 0x93 本帧解析 $groupCount 组记录');
+        for (var i = 0; i < groupCount; i++) {
           final offset = 14 + i * 26;
-          if (offset + 26 <= bytes.length) {
+          if (offset + 26 <= dataEnd) {
             final raw = bytes.sublist(offset, offset + 26);
             debugPrint('[数据管理] 0x93 组$i 原始数据: ${raw.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
             _reportBuffer.add(ReportSummary.fromBytes(bytes, offset));
@@ -1293,7 +1325,8 @@ class BleDataCubit extends Cubit<BleDataState> {
       debugPrint('[数据管理] 0x94 累积 ${_sleepDataBuffer.length} 字节');
 
       if (_sleepDataBuffer.last != 0x0D) {
-        // 数据未接收完，继续缓冲
+        // 数据未接收完，继续缓冲（日志仍记录，不吞掉该包）
+        emit(state.copyWith(lastReceived: bytes, rawLog: log));
         return;
       }
 
@@ -1405,6 +1438,14 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
+  /// 格式化 0x93 完整帧日志（重组后的所有字节）
+  String _format93FrameLog(String time, List<int> frame) {
+    final hex = frame
+        .map((b) => b.toRadixString(16).padLeft(2, '0'))
+        .join(' ');
+    return '$time  0x93帧(${frame.length}B): $hex';
+  }
+
   void _stopDataFlow() {
     debugPrint('[数据管理] 停止数据流');
     _dataSub?.cancel();
@@ -1450,6 +1491,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _parametersCompleter = null;
     _reportBuffer = [];
     _reportBatchReceived = 0;
+    _report93FrameBuffer = [];
     if (_reportQueryCompleter != null && !_reportQueryCompleter!.isCompleted) {
       _reportQueryCompleter!.complete([]);
     }

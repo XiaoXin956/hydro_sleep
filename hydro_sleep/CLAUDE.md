@@ -96,6 +96,9 @@ flutter gen-l10n
 # Run build_runner (Isar models)
 flutter pub run build_runner build --delete-conflicting-outputs
 
+# Run build_runner (no delete flag) - 修改 lib/data/local/ 下 Isar @collection 模型后，重新生成 .g.dart 代码
+flutter pub run build_runner build
+
 # Analyze
 flutter analyze
 

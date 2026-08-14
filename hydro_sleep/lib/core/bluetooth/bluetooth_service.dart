@@ -109,6 +109,25 @@ class BleService {
   BluetoothCharacteristic? _notifyChar;
   BluetoothCharacteristic? _writeChar;
 
+  /// 设备写模式已降级标记（带响应写失败后切到无响应写）
+  bool _writeWithoutResponseOnly = false;
+
+  /// 判断特征值 UUID 是否匹配协议短 UUID（如 fff2）
+  /// 兼容两种形式：
+  /// 1. 标准 Bluetooth Base UUID：0000fff2-0000-1000-8000-00805f9b34fb
+  /// 2. 自定义 128 位 UUID 以短 UUID 结尾：xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxfff2
+  static bool _matchesUuid(BluetoothCharacteristic c, String shortUuid) {
+    final str = c.uuid.str.toLowerCase().replaceAll('-', '');
+    // 标准 Base UUID 形式：16 位 UUID 位于前 4 位（0000FFFF-...）
+    if (str.length == 32 &&
+        str.endsWith('00001000800000805f9b34fb') &&
+        str.substring(4, 8) == shortUuid.toLowerCase()) {
+      return true;
+    }
+    // 自定义 128 位 UUID 以短 UUID 结尾
+    return str.endsWith(shortUuid.toLowerCase());
+  }
+
   /// 发现设备所有服务和特征值
   Future<List<BluetoothService>> discoverServices(String remoteId) async {
     debugPrint('[蓝牙服务] 发现服务: $remoteId');
@@ -130,10 +149,22 @@ class BleService {
     return services;
   }
 
-  /// 找到第一个支持 Notify 的特征值并缓存
+  /// 找到 Notify 特征值（优先协议 UUID fff1，fallback 第一个 notify）并缓存
   BluetoothCharacteristic? findNotifyCharacteristic(
     List<BluetoothService> services,
   ) {
+    // 优先匹配协议规定的通知特征 UUID fff1
+    for (final s in services) {
+      for (final c in s.characteristics) {
+        if (c.properties.notify && _matchesUuid(c, 'fff1')) {
+          _notifyChar = c;
+          debugPrint(
+            '[蓝牙服务] 找到 Notify 特征值(协议): ${c.uuid} (service: ${s.uuid})',
+          );
+          return c;
+        }
+      }
+    }
     for (final s in services) {
       for (final c in s.characteristics) {
         if (c.properties.notify) {
@@ -149,11 +180,49 @@ class BleService {
     return null;
   }
 
-  /// 找到第一个支持 Write 的特征值并缓存
+  /// 找到 Write 特征值（优先协议 UUID fff2，其次与 Notify 同服务，
+  /// fallback 第一个可写）并缓存
   /// 兼容 write（带响应）和 writeWithoutResponse（无响应）两种属性
   BluetoothCharacteristic? findWriteCharacteristic(
     List<BluetoothService> services,
   ) {
+    // 1. 优先匹配协议规定的写入特征 UUID fff2
+    for (final s in services) {
+      for (final c in s.characteristics) {
+        if ((c.properties.write || c.properties.writeWithoutResponse) &&
+            _matchesUuid(c, 'fff2')) {
+          _writeChar = c;
+          debugPrint(
+            '[蓝牙服务] 找到 Write 特征值(协议): ${c.uuid} (service: ${s.uuid}) '
+            'write=${c.properties.write} '
+            'writeWithoutResponse=${c.properties.writeWithoutResponse}',
+          );
+          return c;
+        }
+      }
+    }
+    // 2. 与 Notify 特征值同一 service 的可写特征（协议数据服务 ff00）
+    //    （避免 fallback 误选 Generic Access 的 Device Name 等无关可写特征）
+    if (_notifyChar != null) {
+      final notifyService = services
+          .where((s) => s.characteristics.contains(_notifyChar))
+          .firstOrNull;
+      if (notifyService != null) {
+        for (final c in notifyService.characteristics) {
+          if (c.properties.write || c.properties.writeWithoutResponse) {
+            _writeChar = c;
+            debugPrint(
+              '[蓝牙服务] 找到 Write 特征值(与Notify同服务): ${c.uuid} '
+              '(service: ${notifyService.uuid}) '
+              'write=${c.properties.write} '
+              'writeWithoutResponse=${c.properties.writeWithoutResponse}',
+            );
+            return c;
+          }
+        }
+      }
+    }
+    // 3. fallback 任意可写特征
     for (final s in services) {
       for (final c in s.characteristics) {
         if (c.properties.write || c.properties.writeWithoutResponse) {
@@ -172,20 +241,47 @@ class BleService {
   }
 
   /// 向写特征值发送数据
-  /// 仅支持 writeWithoutResponse 时用无响应写入，否则用带响应写入
+  /// 优先带响应写入（可靠）；若设备不支持带响应写（超时/报错），
+  /// 自动降级为无响应写入，并记住该设备模式，避免每次写都超时
   Future<void> writeData(List<int> data) async {
     final char = _writeChar;
     if (char == null) {
       debugPrint('[蓝牙服务] writeData 失败: 未找到写特征值');
       throw Exception('未找到写特征值');
     }
-    final withoutResponse =
-        !char.properties.write && char.properties.writeWithoutResponse;
+    final canWrite = char.properties.write;
+    final canWriteWithoutResponse = char.properties.writeWithoutResponse;
     debugPrint(
-      '[蓝牙服务] 写入数据 (withoutResponse=$withoutResponse): '
+      '[蓝牙服务] 写入数据 uuid=${char.uuid} '
+      '(write=$canWrite, writeWithoutResponse=$canWriteWithoutResponse, '
+      'withoutResponseOnly=$_writeWithoutResponseOnly): '
       '${data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
     );
-    await char.write(data, withoutResponse: withoutResponse);
+
+    if (_writeWithoutResponseOnly) {
+      await char.write(data, withoutResponse: true);
+      return;
+    }
+
+    // 仅支持无响应写时直接用无响应模式
+    if (!canWrite && canWriteWithoutResponse) {
+      _writeWithoutResponseOnly = true;
+      await char.write(data, withoutResponse: true);
+      return;
+    }
+
+    // 默认带响应写入；失败则降级无响应写入（针对固件不回复 ATT Write Response 的设备）
+    try {
+      await char.write(data, withoutResponse: false, timeout: 5);
+    } catch (e) {
+      debugPrint('[蓝牙服务] 带响应写入失败，降级无响应写入: $e');
+      if (canWriteWithoutResponse) {
+        _writeWithoutResponseOnly = true;
+        await char.write(data, withoutResponse: true);
+      } else {
+        rethrow;
+      }
+    }
   }
 
   /// 开启 Notify

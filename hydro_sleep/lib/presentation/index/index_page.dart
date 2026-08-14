@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/index/widgets/ble_debug_card.dart';
+import 'package:hydro_sleep/presentation/index/widgets/ble_log_switch_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/connection_status_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/mode_selection_card.dart';
 import 'package:hydro_sleep/presentation/index/widgets/realtime_data_card.dart';
@@ -48,6 +49,8 @@ class IndexPage extends StatelessWidget {
                   const SizedBox(height: 16),
                   const ScheduleCard(),
                   const SizedBox(height: 16),
+                  const BleLogSwitchCard(),
+                  const SizedBox(height: 16),
                   const BleDebugCard(),
                   const SizedBox(height: 16),
                   const SentDataLogCard(),
@@ -55,7 +58,7 @@ class IndexPage extends StatelessWidget {
                 ];
                 return items[index];
               },
-              childCount: 16,
+              childCount: 18,
             ),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
@@ -26,6 +27,30 @@ enum BleDataStatus {
   error,
 }
 
+/// BLE 响应数据类型（用于日志打印/保存开关）
+enum BleLogType {
+  deviceInfo('A5 5A 设备信息'),
+  retransmit('0x81 重传120s'),
+  retransmit30('0x82 重传30min'),
+  stop('0x83 停止响应'),
+  mode('0x84 模式响应'),
+  secondData('0x85 实时秒'),
+  minuteData('0x86 实时分钟'),
+  deviceStatus('0x87 设备状态'),
+  heartbeat('0x88 心跳'),
+  calibrate('0x89 压力校准'),
+  parameter('0x8A 参数'),
+  clock('0x8B 时钟校准'),
+  firmware('0x8C 固件版本'),
+  report('0x93 报表'),
+  sleepData('0x94 分钟数据'),
+  factoryReset('0x97 恢复出厂'),
+  unknown('未知类型');
+
+  final String label;
+  const BleLogType(this.label);
+}
+
 // --- State ---
 
 class BleDataState extends Equatable {
@@ -37,6 +62,9 @@ class BleDataState extends Equatable {
   final List<int>? lastReceived;
   final List<String> rawLog;
   final List<String> sentLog; // 发送数据日志（最新200条）
+
+  /// 关闭日志打印/保存的响应类型（空集合 = 全部开启）
+  final Set<BleLogType> disabledLogTypes;
 
   /// 最新一条实时秒数据（0x85）
   final RetransmitRecord? latestSecondRecord;
@@ -58,6 +86,7 @@ class BleDataState extends Equatable {
     this.lastReceived,
     this.rawLog = const [],
     this.sentLog = const [],
+    this.disabledLogTypes = const {},
     this.latestSecondRecord,
     this.secondRecords = const [],
     this.latestMinuteRecord,
@@ -74,6 +103,7 @@ class BleDataState extends Equatable {
     List<int>? lastReceived,
     List<String>? rawLog,
     List<String>? sentLog,
+    Set<BleLogType>? disabledLogTypes,
     RetransmitRecord? latestSecondRecord,
     List<RetransmitRecord>? secondRecords,
     SleepMinuteRecord? latestMinuteRecord,
@@ -89,6 +119,7 @@ class BleDataState extends Equatable {
       lastReceived: lastReceived ?? this.lastReceived,
       rawLog: rawLog ?? this.rawLog,
       sentLog: sentLog ?? this.sentLog,
+      disabledLogTypes: disabledLogTypes ?? this.disabledLogTypes,
       latestSecondRecord: latestSecondRecord ?? this.latestSecondRecord,
       secondRecords: secondRecords ?? this.secondRecords,
       latestMinuteRecord: latestMinuteRecord ?? this.latestMinuteRecord,
@@ -107,6 +138,7 @@ class BleDataState extends Equatable {
         lastReceived,
         rawLog,
         sentLog,
+        disabledLogTypes,
         latestSecondRecord,
         secondRecords,
         latestMinuteRecord,
@@ -932,14 +964,75 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   static const _maxLogEntries = 1000;
 
+  /// 切换某响应类型的日志打印/保存开关（默认全部开启）
+  void toggleLogType(BleLogType type) {
+    final disabled = Set<BleLogType>.from(state.disabledLogTypes);
+    if (!disabled.add(type)) {
+      disabled.remove(type);
+    }
+    emit(state.copyWith(disabledLogTypes: disabled));
+  }
+
+  /// 根据帧头识别响应数据类型
+  BleLogType _classifyFrame(List<int> bytes) {
+    if (bytes.length >= _deviceInfoLength &&
+        bytes[0] == _headerDeviceByte1 &&
+        bytes[1] == _headerDeviceByte2) {
+      return BleLogType.deviceInfo;
+    }
+    if (bytes.length >= 2) {
+      switch (bytes[1]) {
+        case 0x81:
+          return BleLogType.retransmit;
+        case 0x82:
+          return BleLogType.retransmit30;
+        case 0x83:
+          return BleLogType.stop;
+        case 0x84:
+          return BleLogType.mode;
+        case 0x85:
+          return BleLogType.secondData;
+        case 0x86:
+          return BleLogType.minuteData;
+        case 0x87:
+          return BleLogType.deviceStatus;
+        case 0x88:
+          return BleLogType.heartbeat;
+        case 0x89:
+          return BleLogType.calibrate;
+        case 0x8A:
+          return BleLogType.parameter;
+        case 0x8B:
+          return BleLogType.clock;
+        case 0x8C:
+          return BleLogType.firmware;
+        case 0x93:
+          return BleLogType.report;
+        case 0x94:
+          return BleLogType.sleepData;
+        case 0x97:
+          return BleLogType.factoryReset;
+      }
+    }
+    return BleLogType.unknown;
+  }
+
   void _onDataReceived(List<int> bytes) {
     final remoteId = _connectCubit.state.remoteId;
     final mtu = remoteId != null
         ? BluetoothDevice.fromId(remoteId).mtuNow
         : 0;
-    debugPrint('[数据管理] MTU=$mtu, 收到数据 (${bytes.length}字节): ${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
 
     if (bytes.isEmpty) return;
+
+    // 日志类型开关：关闭时隐藏该类型的打印和 rawLog 保存
+    final logEnabled = !state.disabledLogTypes.contains(_classifyFrame(bytes));
+    // 局部 debugPrint 遮蔽全局，按开关过滤该类型的所有日志打印
+    void debugPrint(String? message) {
+      if (logEnabled) foundation.debugPrint(message);
+    }
+
+    debugPrint('[数据管理] MTU=$mtu, 收到数据 (${bytes.length}字节): ${bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}');
 
     // 格式化为 hex 字符串，带时间戳
     final now = DateTime.now();
@@ -950,34 +1043,43 @@ class BleDataCubit extends Cubit<BleDataState> {
     final hex = bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
     final logEntry = '$time  $hex';
 
-    final log = List<String>.from(state.rawLog)..add(logEntry);
-    if (log.length > _maxLogEntries) {
-      log.removeAt(0);
+    List<String> log;
+    if (logEnabled) {
+      log = List<String>.from(state.rawLog)..add(logEntry);
+      if (log.length > _maxLogEntries) {
+        log.removeAt(0);
+      }
+    } else {
+      // 类型已关闭：不追加 rawLog（不保存），沿用现有日志
+      log = state.rawLog;
     }
 
     // 0x93 帧重组：一帧可能被拆成多个 notify 包（MTU 限制），
     // 首包以 7D 93 开头，后续为数据续包；重组后每帧记录一行完整日志
-    if (bytes.length >= 2 && bytes[0] == 0x7D && bytes[1] == _headerCmd0x93) {
-      // 新帧开始，若上一帧未以 0x0D 结束（中间批次），先补记上一帧
-      if (_report93FrameBuffer.isNotEmpty) {
+    if (logEnabled) {
+      if (bytes.length >= 2 && bytes[0] == 0x7D && bytes[1] == _headerCmd0x93) {
+        // 新帧开始，若上一帧未以 0x0D 结束（中间批次），先补记上一帧
+        if (_report93FrameBuffer.isNotEmpty) {
+          log.add(_format93FrameLog(time, _report93FrameBuffer));
+          if (log.length > _maxLogEntries) {
+            log.removeAt(0);
+          }
+        }
+        _report93FrameBuffer = List.of(bytes);
+      } else if (_report93FrameBuffer.isNotEmpty) {
+        // 0x93 帧的续包
+        _report93FrameBuffer.addAll(bytes);
+      }
+
+      // 帧以 0x0D 结尾（仅末尾批次），记录完整帧
+      if (_report93FrameBuffer.isNotEmpty &&
+          _report93FrameBuffer.last == 0x0D) {
         log.add(_format93FrameLog(time, _report93FrameBuffer));
         if (log.length > _maxLogEntries) {
           log.removeAt(0);
         }
+        _report93FrameBuffer = [];
       }
-      _report93FrameBuffer = List.of(bytes);
-    } else if (_report93FrameBuffer.isNotEmpty) {
-      // 0x93 帧的续包
-      _report93FrameBuffer.addAll(bytes);
-    }
-
-    // 帧以 0x0D 结尾（仅末尾批次），记录完整帧
-    if (_report93FrameBuffer.isNotEmpty && _report93FrameBuffer.last == 0x0D) {
-      log.add(_format93FrameLog(time, _report93FrameBuffer));
-      if (log.length > _maxLogEntries) {
-        log.removeAt(0);
-      }
-      _report93FrameBuffer = [];
     }
 
     // 按 bytes[1] 数据类型分发（bytes[0] 为帧头）

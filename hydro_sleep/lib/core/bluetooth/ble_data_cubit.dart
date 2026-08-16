@@ -208,6 +208,18 @@ class BleDataCubit extends Cubit<BleDataState> {
   // 温度存储节流（每 10 秒存一条）
   DateTime _lastTempSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
 
+  /// 默认固定签名 "UNCONFIGED"（10 字节）
+  static const _defaultAsciiId = [
+    0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44,
+  ];
+
+  /// 设备 ASCII ID（bytes[4..13]，10 字节），来自 0x87 响应或本地缓存，
+  /// 发送命令帧时替代固定 "UNCONFIGED"，无缓存时使用默认值
+  List<int> _deviceAsciiId = _defaultAsciiId;
+
+  /// 当前命令帧使用的设备 ASCII ID（供调试卡片展示）
+  List<int> get deviceAsciiId => _deviceAsciiId;
+
   static const _deviceInfoLength = 11;
   static const _defaultTimeout = Duration(seconds: 30);
   static const _headerDeviceByte1 = 0xA5;
@@ -294,16 +306,27 @@ class BleDataCubit extends Cubit<BleDataState> {
     return [0x7D, 0x13, 0x0F, 0x00, 0x55, 0x4E, 0x43, 0x4F, 0x4E, 0x46, 0x49, 0x47, 0x45, 0x44, 0x0D];
   }
 
+  /// 将通用命令帧（7D 开头）bytes[4..13] 的固定签名替换为已保存的设备 ASCII ID
+  /// A5 5A 控制帧（0xA5 开头）等非 7D 帧不处理
+  List<int> _withDeviceId(List<int> frame) {
+    if (frame.length >= 15 && frame[0] == 0x7D) {
+      return [...frame.sublist(0, 4), ..._deviceAsciiId, ...frame.sublist(14)];
+    }
+    return frame;
+  }
+
   /// 写入数据并记录发送日志
   Future<void> _writeWithLog(List<int> data) async {
-    await _bleService.writeData(data);
+    // 统一替换设备 ID，保证所有命令（含测试卡片直接 sendCommand）携带真实 ID
+    final payload = _withDeviceId(data);
+    await _bleService.writeData(payload);
 
     final now = DateTime.now();
     final time =
         '${now.hour.toString().padLeft(2, '0')}:'
         '${now.minute.toString().padLeft(2, '0')}:'
         '${now.second.toString().padLeft(2, '0')}';
-    final hex = data.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    final hex = payload.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
     final logEntry = '$time  $hex';
 
     final log = List<String>.from(state.sentLog)..add(logEntry);
@@ -394,6 +417,21 @@ class BleDataCubit extends Cubit<BleDataState> {
       if (remoteId == null) {
         emit(state.copyWith(status: BleDataStatus.error, error: 'noRemoteId'));
         return;
+      }
+
+      // 0. 加载本地缓存的设备 ASCII ID（0x87 响应前命令帧也携带真实 ID）
+      final savedId = await _secureStorage.getDeviceAsciiId(remoteId);
+      if (savedId != null && savedId.length == 10) {
+        _deviceAsciiId = savedId;
+        debugPrint(
+          '[数据管理] 已加载设备 ID (${savedId.length}字节): '
+          '${_deviceAsciiId.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ')}',
+        );
+      } else {
+        debugPrint(
+          '[数据管理] 无有效设备 ID 缓存（savedId=${savedId?.length ?? 0}字节），'
+          '命令帧使用默认 UNCONFIGED',
+        );
       }
 
       // 1. 发现服务
@@ -1275,6 +1313,13 @@ class BleDataCubit extends Cubit<BleDataState> {
       if (bytes.length >= 21) {
         final status = DeviceStatus.fromBytes(bytes);
         debugPrint('[数据管理] 设备状态: $status');
+        // 更新设备 ASCII ID（bytes[4..13]）并持久化，供后续命令帧携带
+        if (status.asciiId.length == 10) {
+          _deviceAsciiId = status.asciiId;
+          if (remoteId != null) {
+            unawaited(_secureStorage.saveDeviceAsciiId(remoteId, status.asciiId));
+          }
+        }
         emit(state.copyWith(
           deviceId: status.deviceId,
           lastReceived: bytes,

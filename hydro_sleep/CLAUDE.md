@@ -118,7 +118,7 @@ flutter run
   - `BedExitCubit` — `Cubit<String>`, bed exit shutdown timer, persists via `SecureStorageService`
   - `DeviceListCubit` — `DeviceListState` with `List<HistoryDevice>` + expand/collapse, loads from `DeviceRepository`
   - `BleScanCubit` — BLE 扫描状态（scanning/scanResults/error），Android 平台动态权限处理
-  - `BleConnectCubit` — BLE 连接生命周期（connecting/connected/disconnecting/disconnected/reconnecting/failed），断开检测（stream + 3s 定时轮询），自动重连（maxRetries=3, autoConnect: true, 20s 超时, 10s 间隔），蓝牙关闭自动清理
+  - `BleConnectCubit` — BLE 连接生命周期（connecting/connected/disconnecting/disconnected/reconnecting/failed），断开检测（stream + 3s 定时轮询），自动重连（**直接连接 autoConnect: false** 重试 3 次，15s 超时，3s 间隔），蓝牙关闭自动清理
   - `BleDataCubit` — BLE 数据流管理（discovering → subscribing → streaming），按 `bytes[1]` 分发响应类型，支持命令发送+响应等待（`Completer` 模式），连接成功后自动查询固件版本（0x0C）+ 设备状态（0x07 带 MAC），`deviceId` 从 0x87 响应存入 state。实时数据存储：0x85 秒数据环形缓冲（120条）、0x86 分钟数据环形缓冲（30条）。0x93 分批收集完成后 Isar 持久化并清理缓冲
 - **Internationalization**: ARB-based (`flutter gen-l10n`). English is default. Language persisted via `SecureStorageService.saveLanguage()`. `LocaleCubit` loads saved locale on startup. Use `AppLocalizations.of(context)!` to access translations.
 - **Data layer**: Two singletons - `HydroSleepDatabase` (Isar) and `SecureStorageService` (flutter_secure_storage). Repositories wrap these.
@@ -151,7 +151,7 @@ flutter run
   - 0x87 响应解析后，`asciiId`（bytes[4..13] 原始字节）以 hex 字符串存入 SecureStorage，key = `device_ascii_id_{remoteId}`
   - 0x13/0x14 命令帧 bytes[4..13] 使用 SecureStorage 缓存的 `asciiId` 替代固定 "UNCONFIGED"，无缓存时 fallback 为 "UNCONFIGED"
   - 详细协议文档见 `BLE_PROTOCOL.md`
-- **BLE GATT cache**: `autoConnect: true` 时 Android 不调用 `gatt.close()` 导致服务缓存过期，`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制清除
+- **BLE GATT cache**：重连改用直接连接（autoConnect: false），`_autoReconnect` 每次 `connect()` 前先 `disconnect()` 强制关闭旧 GATT 对象、清除 Android 缓存的服务
 - **设备关机 UI 模式**：`deviceInfo.isPoweredOff`（`powerStatus == 0`）时，首页模式/水位/温度/工作时间卡片使用 `Opacity(0.5)` + `IgnorePointer(ignoring: true)` 灰化禁用
 - **水位卡片三态**：poweredOff 或 null → "未知"（灰色），`waterLevel == 0` → "正常"（绿色），其他 → "异常"（橙色）
 - **日报告 DB 查询**：`DailyReportCubit.selectDate(date)` 查询 Isar 的 `SleepDataRepository.getReportsByDeviceAndDateRange()`，按日期范围检索 `ReportSummary`，切换日期不立即清空（动画连续性）

@@ -42,6 +42,8 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
     final isConnecting = connectState.isConnecting;
     final isReconnecting = connectState.isReconnecting;
     final deviceName = connectState.deviceName;
+    // 有历史设备（remoteId 不为空）时可手动重连
+    final hasDevice = connectState.remoteId != null;
 
     return Card(
       child: Padding(
@@ -85,7 +87,7 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
               ],
             ),
             const SizedBox(height: 12),
-            _buildActions(context, theme, l10n, isConnected, isConnecting || isReconnecting, deviceName),
+            _buildActions(context, theme, l10n, isConnected, isConnecting || isReconnecting, deviceName, hasDevice),
           ],
         ),
       ),
@@ -99,6 +101,7 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
     bool isConnected,
     bool isConnecting,
     String? deviceName,
+    bool hasDevice,
   ) {
     if (isConnecting) {
       return Row(
@@ -163,6 +166,41 @@ class _ConnectionStatusCardState extends State<ConnectionStatusCard> {
             child: Text(
               l10n.disconnect,
               style: TextStyle(color: Colors.red.shade400, fontSize: 13),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 未连接：有历史设备时显示「重新连接」按钮（可点击直接重连），否则引导添加设备
+    if (hasDevice) {
+      return Row(
+        children: [
+          Icon(
+            deviceName == null || deviceName.isEmpty
+                ? Icons.bluetooth_disabled
+                : Icons.bluetooth,
+            color: AppColors.textSecondary,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              deviceName?.isNotEmpty == true ? deviceName! : (l10n.notConnected),
+              style: theme.textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.read<BleConnectCubit>().reconnect(),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              l10n.reconnect,
+              style: const TextStyle(fontSize: 13, color: AppColors.primary),
             ),
           ),
         ],

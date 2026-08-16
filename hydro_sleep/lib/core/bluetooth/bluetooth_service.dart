@@ -63,7 +63,9 @@ class BleService {
 
   // --- Connection ---
 
-  static const _preferredMtu = 512;
+  /// 协议约定 MTU 为 247（见 BLE_PROTOCOL.md），与连接解耦：
+  /// MTU 协商失败只告警，绝不让 connect() 抛错导致连接被误判为失败
+  static const _preferredMtu = 247;
 
   Future<void> connect(
     String remoteId, {
@@ -74,19 +76,21 @@ class BleService {
       '[蓝牙服务] 发起连接: $remoteId, 自动连接=$autoConnect, 超时=${timeout.inSeconds}秒',
     );
     final device = BluetoothDevice.fromId(remoteId);
+    // 不把 mtu 传入 connect()：Android 上 requestMtu 失败/超时会
+    // 让 connect() 抛错，即使物理连接已经建立（autoConnect 与 mtu 也不兼容）
     await device.connect(
       timeout: timeout,
       autoConnect: autoConnect,
-      mtu: autoConnect ? null : _preferredMtu,
+      mtu: null,
       license: License.nonprofit,
     );
-    // 连接后统一请求 MTU（autoConnect 模式下 connect 不会自动请求）
-    if (autoConnect) {
+    // 连接成功后单独协商 MTU，失败不影响连接状态
+    if (!autoConnect) {
       try {
         final mtu = await device.requestMtu(_preferredMtu);
         debugPrint('[蓝牙服务] MTU 协商结果: $mtu');
       } catch (e) {
-        debugPrint('[蓝牙服务] MTU 请求失败: $e');
+        debugPrint('[蓝牙服务] MTU 请求失败（不影响连接）: $e');
       }
     }
     debugPrint('[蓝牙服务] 连接完成: $remoteId');

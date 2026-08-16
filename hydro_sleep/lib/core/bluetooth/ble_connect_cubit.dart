@@ -197,55 +197,28 @@ class BleConnectCubit extends Cubit<BleConnectState> {
       ),
     );
 
+    // 直接连接（autoConnect: false）比后台 autoConnect 可靠：
+    // autoConnect 依赖系统后台扫描，对未配对设备经常超时/连不上。
+    // 每次 connect() 前先 disconnect() 强制关闭旧 GATT，清除 Android 服务缓存。
     const maxRetries = 3;
-    const attemptTimeout = Duration(seconds: 20);
-
-    // 在循环外设置监听器，避免错过 connect() 和流事件之间的状态变化
-    final completer = Completer<void>();
-    _connSub?.cancel();
-    _connSub = _bleService.connectionState(remoteId).listen((btState) {
-      debugPrint('[连接管理] 重连流事件: $btState');
-      if (btState == BluetoothConnectionState.connected &&
-          !completer.isCompleted) {
-        completer.complete();
-      }
-    });
+    const attemptTimeout = Duration(seconds: 15);
+    const retryDelay = Duration(seconds: 3);
 
     for (var i = 0; i < maxRetries; i++) {
       if (_cancelReconnect!.isCompleted) {
         debugPrint('[连接管理] 自动重连在第 ${i + 1} 次尝试前被取消');
-        _connSub?.cancel();
-        _connSub = null;
         return;
       }
 
       debugPrint('[连接管理] 自动重连第 ${i + 1}/$maxRetries 次尝试');
       try {
-        // 先断开以关闭旧 GATT 对象，清除 Android 缓存的服务
-        if (i > 0) {
-          await _cancelableDelay(const Duration(seconds: 2));
-        }
         try {
           await _bleService.disconnect(remoteId);
         } catch (_) {}
 
-        await _bleService.connect(remoteId, autoConnect: true);
-        debugPrint('[连接管理] 重连第 ${i + 1} 次 connect() 已返回, 等待流确认连接...');
-        await Future.any([
-          completer.future,
-          _cancelReconnect!.future,
-        ]).timeout(attemptTimeout);
-
-        // 区分「连接成功」和「被取消（如蓝牙关闭）」
-        if (_cancelReconnect!.isCompleted) {
-          debugPrint('[连接管理] 自动重连第 ${i + 1} 次被取消（蓝牙可能已关闭）');
-          _connSub?.cancel();
-          _connSub = null;
-          return;
-        }
+        await _bleService.connect(remoteId, timeout: attemptTimeout);
 
         // 连接成功
-        _connSub?.cancel();
         debugPrint('[连接管理] 自动重连第 ${i + 1} 次成功');
         emit(state.copyWith(status: BleConnectStatus.connected, error: null));
         _startConnectionMonitor(remoteId);
@@ -254,20 +227,16 @@ class BleConnectCubit extends Cubit<BleConnectState> {
         debugPrint('[连接管理] 自动重连第 ${i + 1} 次失败: $e');
         if (_cancelReconnect!.isCompleted) {
           debugPrint('[连接管理] 自动重连被取消，停止重试');
-          _connSub?.cancel();
-          _connSub = null;
           return;
         }
         if (i < maxRetries - 1) {
-          debugPrint('[连接管理] 自动重连等待 10 秒后重试...');
-          await _cancelableDelay(const Duration(seconds: 10));
+          debugPrint('[连接管理] 等待 ${retryDelay.inSeconds} 秒后重试...');
+          await _cancelableDelay(retryDelay);
         }
       }
     }
 
     // 3 次全部失败，清理 BLE 连接状态后停止重连
-    _connSub?.cancel();
-    _connSub = null;
     debugPrint('[连接管理] 自动重连 $maxRetries 次全部失败, 清理 BLE 状态');
     if (!_cancelReconnect!.isCompleted) {
       try {
@@ -300,6 +269,23 @@ class BleConnectCubit extends Cubit<BleConnectState> {
     }
     debugPrint('[连接管理] 断开连接完成');
     emit(state.copyWith(status: BleConnectStatus.disconnected, error: null));
+  }
+
+  /// 手动重连：使用上一次连接的设备（remoteId/deviceName）重新发起连接
+  Future<void> reconnect() async {
+    final remoteId = state.remoteId;
+    if (remoteId == null) {
+      debugPrint('[连接管理] reconnect 失败: 无历史设备');
+      return;
+    }
+    debugPrint('[连接管理] 手动重连: $remoteId (${state.deviceName})');
+    await connect(
+      ScannedDevice(
+        remoteId: remoteId,
+        name: state.deviceName ?? '',
+        rssi: 0,
+      ),
+    );
   }
 
   @override

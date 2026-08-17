@@ -36,7 +36,7 @@ class _ClockCalibrateTestCardState extends State<ClockCalibrateTestCard> {
     });
 
     try {
-      final res = await dataCubit.sendCalibrateClockCommand();
+      final res = await dataCubit.sendCalibrateClockCommandV2();
       if (!mounted) return;
       setState(() {
         _loading = false;
@@ -86,6 +86,11 @@ class _ClockCalibrateTestCardState extends State<ClockCalibrateTestCard> {
             const SizedBox(height: 4),
             Text(
               '将当前系统时间同步到设备',
+              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '帧格式: 7D 0B 13 00 [ID 10B] [4字节时间LE] 0D',
               style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
             ),
             if (_result != null) ...[

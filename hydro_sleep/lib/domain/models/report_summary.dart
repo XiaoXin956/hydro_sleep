@@ -36,7 +36,7 @@ class ReportSummary {
 
   /// 从 26 字节解析（offset 为该组数据在帧中的起始位置）
   factory ReportSummary.fromBytes(List<int> bytes, int offset) {
-    // 时间戳 4 字节 BE（设备发送大端序）
+    // 时间戳 4 字节小端序（低位在前，与 0x85/0x86 一致）
     final t0 = bytes[offset];
     final t1 = bytes[offset + 1];
     final t2 = bytes[offset + 2];

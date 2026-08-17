@@ -1,13 +1,13 @@
 /// 设备状态模型 — 解析 0x87 响应
 ///
-/// 0x87 帧结构: [7D][87][..][ID 10B][模式 1B][错误 1B][时间 4B BE][0D]
+/// 0x87 帧结构: [7D][87][..][ID 10B][模式 1B][错误 1B][时间 4B LE][0D]
 /// fromBytes 接收完整帧 bytes，从 offset 0 开始
 class DeviceStatus {
   final String deviceId; // bytes[4..13]，10字节 MAC（前面补 00），hex 格式
   final List<int> asciiId; // bytes[4..13]，10字节原始字节
   final int mode;        // bytes[14]
   final int error;       // bytes[15]（0x00=无错误）
-  final DateTime? timestamp; // bytes[16..19] Unix 秒，大端序
+  final DateTime? timestamp; // bytes[16..19] Unix 秒，小端序
 
   const DeviceStatus({
     required this.deviceId,
@@ -52,8 +52,8 @@ class DeviceStatus {
     // bytes[14] = mode, bytes[15] = error
     final mode = bytes[14];
     final error = bytes[15];
-    // bytes[16..19] = Unix 秒，大端序
-    final timeRaw = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+    // bytes[16..19] = Unix 秒，小端序
+    final timeRaw = bytes[16] | (bytes[17] << 8) | (bytes[18] << 16) | (bytes[19] << 24);
     return DeviceStatus(
       deviceId: id,
       asciiId: idBytes,

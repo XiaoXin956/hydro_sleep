@@ -17,6 +17,7 @@ class _DeviceIdTestCardState extends State<DeviceIdTestCard> {
   String? _error;
   List<int>? _storedId; // SecureStorage 中缓存的 ID
   List<int>? _memoryId; // BleDataCubit 内存中的 ID
+  List<int>? _convertedId; // 由 remoteId 转换的 ID（00 补充 + remoteId）
 
   Future<void> _queryDeviceId() async {
     setState(() {
@@ -24,6 +25,7 @@ class _DeviceIdTestCardState extends State<DeviceIdTestCard> {
       _error = null;
       _storedId = null;
       _memoryId = null;
+      _convertedId = null;
     });
 
     try {
@@ -36,6 +38,9 @@ class _DeviceIdTestCardState extends State<DeviceIdTestCard> {
           remoteId != null ? await SecureStorageService().getDeviceAsciiId(remoteId) : null;
       // 2. BleDataCubit 内存中当前命令帧使用的 ID
       final memory = dataCubit.deviceAsciiId;
+      // 3. 由 remoteId 转换的 ID（前 4 字节 00 + 后 6 字节 remoteId hex）
+      final converted =
+          remoteId != null ? BleDataCubit.buildDeviceIdFromRemoteId(remoteId) : null;
 
       if (mounted) {
         setState(() {
@@ -47,6 +52,7 @@ class _DeviceIdTestCardState extends State<DeviceIdTestCard> {
           }
           _storedId = stored;
           _memoryId = memory;
+          _convertedId = converted;
         });
       }
     } catch (e) {
@@ -107,6 +113,10 @@ class _DeviceIdTestCardState extends State<DeviceIdTestCard> {
             if (_storedId != null) ...[
               const SizedBox(height: 12),
               _buildIdSection(theme, '本地缓存（SecureStorage）', _storedId!),
+            ],
+            if (_convertedId != null) ...[
+              const SizedBox(height: 12),
+              _buildIdSection(theme, '转换 ID（00补充+remoteId）', _convertedId!),
             ],
           ],
         ),

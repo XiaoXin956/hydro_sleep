@@ -220,6 +220,22 @@ class BleDataCubit extends Cubit<BleDataState> {
   /// 当前命令帧使用的设备 ASCII ID（供调试卡片展示）
   List<int> get deviceAsciiId => _deviceAsciiId;
 
+  /// 由 BLE 地址（remoteId，如 06:02:01:00:6B:20）生成 10 字节设备 ID：
+  /// 取地址最后 6 字节（标准 MAC 固定 6 字节），前面补 00 凑满 10 字节
+  static List<int> buildDeviceIdFromRemoteId(String remoteId) {
+    // 每段解析为字节（只取低 8 位，防 iOS UUID 等超长段）
+    final macBytes = remoteId
+        .split(':')
+        .map((p) => (int.tryParse(p.trim(), radix: 16) ?? 0) & 0xFF)
+        .toList();
+    // 取最后 6 字节作为设备地址，不足则原样使用
+    final tail = macBytes.length >= 6
+        ? macBytes.sublist(macBytes.length - 6)
+        : macBytes;
+    // 前面补 00 凑满 10 字节
+    return [...List<int>.filled(10 - tail.length, 0x00), ...tail];
+  }
+
   static const _deviceInfoLength = 11;
   static const _defaultTimeout = Duration(seconds: 30);
   static const _headerDeviceByte1 = 0xA5;
@@ -473,10 +489,8 @@ class BleDataCubit extends Cubit<BleDataState> {
         },
       );
 
-      // 连接成功后自动查询固件版本
-      // await sendFirmwareVersionCommand();
-      // 连接成功后自动查询设备状态（带 MAC 的 0x07）
-      // sendDeviceStatusCommand();
+      // 连接成功后先发送设备状态查询（0x07），确定设备 ID
+      sendDeviceStatusCommand();
     } catch (e) {
       debugPrint('[数据管理] 启动数据流失败: $e');
       emit(state.copyWith(status: BleDataStatus.error, error: '$e'));
@@ -688,10 +702,10 @@ class BleDataCubit extends Cubit<BleDataState> {
   }
 
   /// 校准时钟 0x0B，发送当前时间（UTC 时区），设备更新时钟并返回 0x8B
-  /// 帧格式: 7D 0B 13 00 UNCONFIGED [4字节 Unix 时间戳 LE] 0D（共 19 字节）
-  /// 可选传入指定时间，默认使用当前系统时间
+  /// 帧格式: 7D 0B 13 00 [ID 10B] [4字节 Unix 时间戳 LE] 0D（共 19 字节）
+  /// ID 为设备 ID（发送时由 _withDeviceId 替换），时间部分替换为当前系统时间
   /// 返回发送的时间、十进制时间戳与完整帧数据（用于 UI 展示）
-  Future<({bool ok, DateTime time, int epoch, List<int> frame})> sendCalibrateClockCommand({
+  Future<({bool ok, DateTime time, int epoch, List<int> frame})> sendCalibrateClockCommandV2({
     DateTime? time,
     Duration timeout = _defaultTimeout,
   }) async {
@@ -1254,9 +1268,11 @@ class BleDataCubit extends Cubit<BleDataState> {
         _modeCommandCompleter!.complete(content);
       }
     } else if (bytes.length >= 2 && bytes[1] == _headerCmd0x85) {
-      // 0x85：实时秒数据（每秒），监控/调试模式下自动推送，12字节同 RetransmitRecord
-      if (bytes.length >= 14) {
-        final record = RetransmitRecord.fromBytes(bytes, 2);
+      // 0x85：实时秒数据（每秒），监控/调试模式下自动推送
+      // 帧结构：[7D 85][长度1B][序号1B][UNCONFIGED 10B][记录12B同 RetransmitRecord][0D帧尾]
+      // 记录从 bytes[14] 开始（实测帧长 27：2+1+1+10+12+1）
+      if (bytes.length >= 14 + _retransmitRecordSize) {
+        final record = RetransmitRecord.fromBytes(bytes, 14);
         final updated = List<RetransmitRecord>.from(state.secondRecords)
           ..add(record);
         if (updated.length > 120) updated.removeAt(0);

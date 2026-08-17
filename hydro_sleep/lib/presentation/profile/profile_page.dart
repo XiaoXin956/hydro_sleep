@@ -13,8 +13,25 @@ import 'package:hydro_sleep/presentation/profile/widgets/temperature_unit_select
 import 'package:hydro_sleep/presentation/profile/widgets/bed_exit_shutdown_selector.dart';
 
 /// 我的页面
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  bool _firmwareQueried = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 首次进入我的页面：发送 0x0C 查询固件版本信息
+    if (!_firmwareQueried) {
+      _firmwareQueried = true;
+      context.read<BleDataCubit>().sendFirmwareVersionCommand();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -109,20 +126,24 @@ class ProfilePage extends StatelessWidget {
             _SettingsRow(
               theme: theme,
               label: l10n.firmwareVersion,
-              child: BlocBuilder<BleDataCubit, BleDataState>(
-                buildWhen: (prev, curr) =>
-                    prev.firmwareVersion != curr.firmwareVersion,
-                builder: (context, dataState) {
-                  final version = dataState.firmwareVersion;
-                  return Text(
-                    version ?? '--',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: version == null
-                          ? AppColors.textHint
-                          : theme.textTheme.bodyMedium?.color,
-                    ),
-                  );
-                },
+              child: Flexible(
+                child: BlocBuilder<BleDataCubit, BleDataState>(
+                  buildWhen: (prev, curr) =>
+                      prev.firmwareVersion != curr.firmwareVersion,
+                  builder: (context, dataState) {
+                    final version = dataState.firmwareVersion;
+                    return Text(
+                      version ?? '--',
+                      softWrap: true,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: version == null
+                            ? AppColors.textHint
+                            : theme.textTheme.bodyMedium?.color,
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],

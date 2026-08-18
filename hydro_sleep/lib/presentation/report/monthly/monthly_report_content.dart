@@ -1,51 +1,57 @@
 import 'package:flutter/material.dart';
-import 'package:hydro_sleep/core/theme/app_colors.dart';
-import 'package:hydro_sleep/l10n/app_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
+import 'package:hydro_sleep/presentation/report/monthly/bloc/monthly_report_cubit.dart';
 import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
+import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dart';
 
-/// 月报告内容（占位）
+/// 月报告内容
 class MonthlyReportContent extends StatelessWidget {
   const MonthlyReportContent({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
+    return BlocProvider(
+      create: (_) => MonthlyReportCubit(
+        connectCubit: context.read<BleConnectCubit>(),
+      )..selectMonth(DateTime.now()),
+      child: const _MonthlyReportBody(),
+    );
+  }
+}
 
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => [
-                const DateHeader(period: DatePeriod.month),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.bar_chart,
-                              size: 48, color: AppColors.textHint),
-                          const SizedBox(height: 16),
-                          Text(
-                            l10n.reportTitle,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ][index],
-              childCount: 3,
-            ),
+class _MonthlyReportBody extends StatelessWidget {
+  const _MonthlyReportBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(6),
+      physics: const ClampingScrollPhysics(),
+      children: [
+        DateHeader(
+          period: DatePeriod.month,
+          onPeriodChanged: (date) {
+            context.read<MonthlyReportCubit>().selectMonth(date);
+          },
+        ),
+        const SizedBox(height: 4),
+        BlocBuilder<MonthlyReportCubit, MonthlyReportState>(
+          builder: (context, state) => SleepScoreCard(
+            score: state.avgScore,
+            totalMinutes: state.avgTotalMinutes,
+            showBedtime: false,
           ),
         ),
+        const SizedBox(height: 16),
+        BlocBuilder<MonthlyReportCubit, MonthlyReportState>(
+          builder: (context, state) => SleepStagesSummary(
+            stats: state.stageStats,
+            dateKey: state.selectedDate,
+          ),
+        ),
+        const SizedBox(height: 16),
       ],
     );
   }

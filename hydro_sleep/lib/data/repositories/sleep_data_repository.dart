@@ -169,6 +169,21 @@ class SleepDataRepository {
     return result;
   }
 
+  /// 按时间范围查询分钟级数据（周/月报告用，直接范围查询）
+  static Future<List<SleepMinuteData>> getSleepMinuteDataByRange({
+    required String deviceId,
+    required DateTime start,
+    required DateTime end,
+  }) async {
+    final db = await HydroSleepDatabase.getInstance();
+    return db.sleepMinuteDatas
+        .filter()
+        .deviceIdEqualTo(deviceId)
+        .timestampBetween(start, end)
+        .sortByTimestamp()
+        .findAll();
+  }
+
   /// 查询指定时间范围内是否存在分钟数据
   static Future<bool> hasSleepMinuteData({
     required String deviceId,

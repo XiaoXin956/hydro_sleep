@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
-import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
+import 'package:hydro_sleep/domain/models/sleep_stage_stats.dart';
 
-/// 睡眠阶段汇总
+/// 睡眠阶段汇总（日/周/月共用，数据由外部传入）
 class SleepStagesSummary extends StatelessWidget {
-  const SleepStagesSummary({super.key});
+  final SleepStageStats? stats;
+
+  /// 切换日期/周期时用于触发动画重播的 key
+  final DateTime dateKey;
+
+  const SleepStagesSummary({
+    super.key,
+    required this.stats,
+    required this.dateKey,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -22,39 +30,35 @@ class SleepStagesSummary extends StatelessWidget {
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: 16),
-            BlocBuilder<DailyReportCubit, DailyReportState>(
-              builder: (context, state) {
-                final stats = state.stageStats;
-                final hasData = stats != null && stats.totalMinutes > 0;
-                final dateKey = state.selectedDate;
+            Builder(builder: (context) {
+              final hasData = stats != null && stats!.totalMinutes > 0;
 
-                final stages = [
-                  (color: Colors.indigo, name: '深睡眠', minutes: stats?.deepMinutes ?? 0, pct: stats?.deepPct ?? 0),
-                  (color: Colors.blue, name: '浅睡眠', minutes: stats?.lightMinutes ?? 0, pct: stats?.lightPct ?? 0),
-                  (color: Colors.purple, name: 'REM', minutes: stats?.remMinutes ?? 0, pct: stats?.remPct ?? 0),
-                  (color: Colors.orange, name: '清醒', minutes: stats?.awakeMinutes ?? 0, pct: stats?.awakePct ?? 0),
-                ];
+              final stages = [
+                (color: Colors.indigo, name: '深睡眠', minutes: stats?.deepMinutes ?? 0, pct: stats?.deepPct ?? 0),
+                (color: Colors.blue, name: '浅睡眠', minutes: stats?.lightMinutes ?? 0, pct: stats?.lightPct ?? 0),
+                (color: Colors.purple, name: 'REM', minutes: stats?.remMinutes ?? 0, pct: stats?.remPct ?? 0),
+                (color: Colors.orange, name: '清醒', minutes: stats?.awakeMinutes ?? 0, pct: stats?.awakePct ?? 0),
+              ];
 
-                return Row(
-                  children: List.generate(stages.length, (i) {
-                    final stage = stages[i];
-                    return Expanded(
-                      child: Padding(
-                        padding: EdgeInsets.only(left: i > 0 ? 4 : 0, right: i < 3 ? 4 : 0),
-                        child: _AnimatedStageItem(
-                          key: ValueKey('stage_${dateKey}_$i'),
-                          color: stage.color,
-                          name: stage.name,
-                          targetMinutes: stage.minutes,
-                          targetPct: stage.pct,
-                          hasData: hasData,
-                        ),
+              return Row(
+                children: List.generate(stages.length, (i) {
+                  final stage = stages[i];
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: i > 0 ? 4 : 0, right: i < 3 ? 4 : 0),
+                      child: _AnimatedStageItem(
+                        key: ValueKey('stage_${dateKey}_$i'),
+                        color: stage.color,
+                        name: stage.name,
+                        targetMinutes: stage.minutes,
+                        targetPct: stage.pct,
+                        hasData: hasData,
                       ),
-                    );
-                  }),
-                );
-              },
-            ),
+                    ),
+                  );
+                }),
+              );
+            }),
           ],
         ),
       ),

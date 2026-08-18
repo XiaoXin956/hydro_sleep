@@ -34,46 +34,49 @@ class _ReportPageState extends State<ReportPage>
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
 
     return Theme(
-      data: Theme.of(context).copyWith(
+      data: theme.copyWith(
         splashFactory: NoSplash.splashFactory,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
         hoverColor: Colors.transparent,
       ),
-      child: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            pinned: true,
-            expandedHeight: 100,
-            flexibleSpace: FlexibleSpaceBar(
-              title: BlocBuilder<BleDataCubit, BleDataState>(
-                buildWhen: (prev, curr) => prev.reportQueryLoading != curr.reportQueryLoading,
-                builder: (context, state) {
-                  return Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        l10n.reportTitle,
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      if (state.reportQueryLoading) ...[
-                        const SizedBox(width: 8),
-                        const SizedBox(
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Row(
+                children: [
+                  Text(
+                    l10n.reportTitle,
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                  BlocBuilder<BleDataCubit, BleDataState>(
+                    buildWhen: (prev, curr) =>
+                        prev.reportQueryLoading != curr.reportQueryLoading,
+                    builder: (context, state) {
+                      if (!state.reportQueryLoading) {
+                        return const SizedBox.shrink();
+                      }
+                      return const Padding(
+                        padding: EdgeInsets.only(left: 8),
+                        child: SizedBox(
                           width: 14,
                           height: 14,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      ],
-                    ],
-                  );
-                },
+                      );
+                    },
+                  ),
+                ],
               ),
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 48),
-              centerTitle: false,
             ),
-            bottom: TabBar(
+            TabBar(
               controller: _tabController,
               labelColor: AppColors.primary,
               unselectedLabelColor: AppColors.textSecondary,
@@ -94,15 +97,17 @@ class _ReportPageState extends State<ReportPage>
                 Tab(text: l10n.dateMonth),
               ],
             ),
-          ),
-        ],
-        body: TabBarView(
-          controller: _tabController,
-          physics: const NeverScrollableScrollPhysics(),
-          children: const [
-            DailyReportContent(),
-            WeeklyReportContent(),
-            MonthlyReportContent(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: const [
+                  DailyReportContent(),
+                  WeeklyReportContent(),
+                  MonthlyReportContent(),
+                ],
+              ),
+            ),
           ],
         ),
       ),

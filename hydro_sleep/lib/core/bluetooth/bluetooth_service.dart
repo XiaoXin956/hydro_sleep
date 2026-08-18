@@ -63,9 +63,9 @@ class BleService {
 
   // --- Connection ---
 
-  /// 协议约定 MTU 为 247（见 BLE_PROTOCOL.md），与连接解耦：
+  /// 协议约定 MTU 为 512（见 BLE_PROTOCOL.md），与连接解耦：
   /// MTU 协商失败只告警，绝不让 connect() 抛错导致连接被误判为失败
-  static const _preferredMtu = 247;
+  static const _preferredMtu = 512;
 
   Future<void> connect(
     String remoteId, {

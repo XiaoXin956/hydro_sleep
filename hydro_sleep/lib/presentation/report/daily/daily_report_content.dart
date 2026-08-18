@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
-import 'package:hydro_sleep/core/bluetooth/ble_data_cubit.dart';
 import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
@@ -21,7 +20,6 @@ import 'package:hydro_sleep/presentation/report/widgets/parameter_test_card.dart
 import 'package:hydro_sleep/presentation/report/widgets/clock_calibrate_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/report_query_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/report_detail_test_card.dart';
-import 'package:hydro_sleep/presentation/report/widgets/firmware_version_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/report_storage_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/sleep_minute_data_test_card.dart';
 import 'package:hydro_sleep/presentation/report/widgets/temperature_record_test_card.dart';
@@ -46,70 +44,69 @@ class _DailyReportBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.all(6),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final items = <Widget>[
-                DateHeader(
-                  period: DatePeriod.day,
-                  onPeriodChanged: (date) {
-                    context.read<DailyReportCubit>().selectDate(date);
-                  },
-                  onRefresh: () {
-                    context.read<BleDataCubit>().sendReportQueryCommand();
-                  },
-                ),
-                const SizedBox(height: 4),
-                const SleepScoreCard(),
-                const SizedBox(height: 16),
-                const SleepStagesSummary(),
-                const SizedBox(height: 16),
-                const SleepTempCurve(),
-                const SizedBox(height: 16),
-                const HeartRateChart(),
-                const SizedBox(height: 16),
-                const RetransmitTestCard(),
-                const SizedBox(height: 16),
-                const Retransmit30TestCard(),
-                const SizedBox(height: 16),
-                const StopCommandTestCard(),
-                const SizedBox(height: 16),
-                const ModeCommandTestCard(),
-                const SizedBox(height: 16),
-                const InitCommandTestCard(),
-                const SizedBox(height: 16),
-                const DeviceStatusTestCard(),
-                const SizedBox(height: 16),
-                const DeviceIdTestCard(),
-                const SizedBox(height: 16),
-                const HeartbeatTestCard(),
-                const SizedBox(height: 16),
-                const PressureCalibrateTestCard(),
-                const SizedBox(height: 16),
-                const ParameterTestCard(),
-                const SizedBox(height: 16),
-                const ClockCalibrateTestCard(),
-                const SizedBox(height: 16),
-                const ReportQueryTestCard(),
-                const SizedBox(height: 16),
-                const ReportDetailTestCard(),
-                const SizedBox(height: 16),
-                const FirmwareVersionTestCard(),
-                const SizedBox(height: 16),
-                const ReportStorageTestCard(),
-                const SizedBox(height: 16),
-                const SleepMinuteDataTestCard(),
-                const SizedBox(height: 16),
-                const TemperatureRecordTestCard(),
-                const SizedBox(height: 40),
-              ];
-              return items[index];
-            }, childCount: 44),
+    return ListView(
+      padding: const EdgeInsets.all(6),
+      physics: const ClampingScrollPhysics(),
+      children: [
+        DateHeader(
+          period: DatePeriod.day,
+          onPeriodChanged: (date) {
+            context.read<DailyReportCubit>().selectDate(date);
+          },
+        ),
+        const SizedBox(height: 4),
+        BlocBuilder<DailyReportCubit, DailyReportState>(
+          builder: (context, state) => SleepScoreCard(
+            score: state.report?.sleepQuality,
+            totalMinutes: state.report?.totalSleepMinutes,
+            startTime: state.report?.startTime,
+            showBedtime: true,
           ),
         ),
+        const SizedBox(height: 16),
+        BlocBuilder<DailyReportCubit, DailyReportState>(
+          builder: (context, state) => SleepStagesSummary(
+            stats: state.stageStats,
+            dateKey: state.selectedDate,
+          ),
+        ),
+        const SizedBox(height: 16),
+        const SleepTempCurve(),
+        const SizedBox(height: 16),
+        const HeartRateChart(),
+        const SizedBox(height: 16),
+        const RetransmitTestCard(),
+        const SizedBox(height: 16),
+        const Retransmit30TestCard(),
+        const SizedBox(height: 16),
+        const StopCommandTestCard(),
+        const SizedBox(height: 16),
+        const ModeCommandTestCard(),
+        const SizedBox(height: 16),
+        const InitCommandTestCard(),
+        const SizedBox(height: 16),
+        const DeviceStatusTestCard(),
+        const SizedBox(height: 16),
+        const DeviceIdTestCard(),
+        const SizedBox(height: 16),
+        const HeartbeatTestCard(),
+        const SizedBox(height: 16),
+        const PressureCalibrateTestCard(),
+        const SizedBox(height: 16),
+        const ParameterTestCard(),
+        const SizedBox(height: 16),
+        const ClockCalibrateTestCard(),
+        const SizedBox(height: 16),
+        const ReportQueryTestCard(),
+        const SizedBox(height: 16),
+        const ReportDetailTestCard(),
+        const SizedBox(height: 16),
+        const ReportStorageTestCard(),
+        const SizedBox(height: 16),
+        const SleepMinuteDataTestCard(),
+        const SizedBox(height: 16),
+        const TemperatureRecordTestCard(),
+        const SizedBox(height: 40),
       ],
     );
   }

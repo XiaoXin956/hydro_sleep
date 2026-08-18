@@ -1,32 +1,46 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:hydro_sleep/core/theme/app_colors.dart';
 import 'package:hydro_sleep/l10n/app_localizations.dart';
-import 'package:hydro_sleep/presentation/report/daily/bloc/daily_report_cubit.dart';
 
-/// 睡眠评分卡片
+/// 睡眠评分卡片（日/周/月共用，数据由外部传入）
 class SleepScoreCard extends StatelessWidget {
-  const SleepScoreCard({super.key});
+  /// 睡眠评分（周/月：平均值），null 表示无数据
+  final int? score;
+
+  /// 睡眠时长（分钟，周/月：平均值），null 表示无数据
+  final int? totalMinutes;
+
+  /// 是否显示入睡→起床时间段（日报告显示，周/月不显示）
+  final bool showBedtime;
+
+  /// 入睡时间（showBedtime 时用于计算起床时间）
+  final DateTime? startTime;
+
+  const SleepScoreCard({
+    super.key,
+    this.score,
+    this.totalMinutes,
+    this.showBedtime = true,
+    this.startTime,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final report = context.watch<DailyReportCubit>().state.report;
 
-    final score = report?.sleepQuality ?? 0;
-    final totalMin = report?.totalSleepMinutes ?? 0;
-    final hasData = report != null;
+    final hasData = score != null && totalMinutes != null;
+    final targetScore = score ?? 0;
+    final totalMin = totalMinutes ?? 0;
 
     // 入睡时间 = startTime，起床时间 = startTime + totalSleepMinutes
-    final startTime = report?.startTime;
     final wakeTime = startTime != null
-        ? startTime.add(Duration(minutes: totalMin))
+        ? startTime!.add(Duration(minutes: totalMin))
         : null;
     final bedtimeStr = startTime != null
-        ? '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}'
+        ? '${startTime!.hour.toString().padLeft(2, '0')}:${startTime!.minute.toString().padLeft(2, '0')}'
         : '--';
     final wakeStr = wakeTime != null
         ? '${wakeTime.hour.toString().padLeft(2, '0')}:${wakeTime.minute.toString().padLeft(2, '0')}'
@@ -41,7 +55,7 @@ class SleepScoreCard extends StatelessWidget {
               width: 120,
               height: 120,
               child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: hasData ? score / 100.0 : 0),
+                tween: Tween(begin: 0, end: hasData ? targetScore / 100.0 : 0),
                 duration: const Duration(milliseconds: 350),
                 curve: Curves.easeOutCubic,
                 builder: (context, progress, _) {
@@ -97,15 +111,17 @@ class SleepScoreCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(l10n.totalSleep, style: theme.textTheme.bodySmall),
-                      const SizedBox(height: 8),
-                      Text(
-                        '$bedtimeStr  →  $wakeStr',
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                      Text(
-                        l10n.bedtimeToWakeUp,
-                        style: theme.textTheme.bodySmall,
-                      ),
+                      if (showBedtime) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '$bedtimeStr  →  $wakeStr',
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                        Text(
+                          l10n.bedtimeToWakeUp,
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
                     ],
                   );
                 },

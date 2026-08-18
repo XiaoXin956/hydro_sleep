@@ -178,6 +178,9 @@ class BleDataCubit extends Cubit<BleDataState> {
   List<int> _retransmit30Buffer = [];
   Timer? _retransmit30Timer;
 
+  // 心跳（0x08）定时器
+  Timer? _heartbeatTimer;
+
   // 固件版本相关
   Completer<String?>? _firmwareVersionCompleter;
 
@@ -489,7 +492,18 @@ class BleDataCubit extends Cubit<BleDataState> {
         },
       );
 
-      // 连接成功后先发送设备状态查询（0x07），确定设备 ID
+      // 4.5. 启动常驻心跳（每 1 分钟发送一次 0x08）
+      _startHeartbeat();
+
+      // 连接成功后按序执行：
+      // 1. 校准时钟 0x0B → 等待 0x8B
+      // 2. 初始化 0x04（监控模式 0x20）→ 等待 0x84
+      // 3. 设备状态查询 0x07（之前的流程，0x87 响应后自动查询 0x13 报表）
+      const connectTimeout = Duration(seconds: 10);
+      final calib = await sendCalibrateClockCommandV2(timeout: connectTimeout);
+      debugPrint('[数据管理] 连接后校准时钟(0x0B→0x8B): ${calib.ok}');
+      final init = await sendInitCommand(timeout: connectTimeout);
+      debugPrint('[数据管理] 连接后初始化(0x04→0x84): $init');
       sendDeviceStatusCommand();
     } catch (e) {
       debugPrint('[数据管理] 启动数据流失败: $e');
@@ -524,20 +538,32 @@ class BleDataCubit extends Cubit<BleDataState> {
     }
   }
 
-  /// 发送初始化指令 0x04（监控模式 0x20），不等待 0x84 响应
-  /// 仅判断是否已连接（streaming 状态），已连接则直接发送，默认成功
-  Future<bool> sendInitCommand() async {
+  /// 发送初始化指令 0x04（监控模式 0x20），等待 0x84 确认响应
+  /// 返回 true 表示收到 0x84，false 表示超时或异常
+  Future<bool> sendInitCommand({
+    Duration timeout = _defaultTimeout,
+  }) async {
     if (state.status != BleDataStatus.streaming) {
       debugPrint('[数据管理] sendInitCommand 失败: 未处于 streaming 状态');
       return false;
     }
+    _modeCommandCompleter = Completer<int>();
     try {
       await _writeWithLog(initCommand);
-      debugPrint('[数据管理] 初始化指令已发送（不等待响应）');
-      return true;
+      debugPrint('[数据管理] 初始化指令已发送（0x04 监控模式 0x20），等待 0x84 响应...');
+      final result = await _modeCommandCompleter!.future.timeout(
+        timeout,
+        onTimeout: () {
+          debugPrint('[数据管理] 初始化 0x84 响应超时');
+          return -1;
+        },
+      );
+      return result != -1;
     } catch (e) {
       debugPrint('[数据管理] sendInitCommand 异常: $e');
       return false;
+    } finally {
+      _modeCommandCompleter = null;
     }
   }
 
@@ -1609,8 +1635,35 @@ class BleDataCubit extends Cubit<BleDataState> {
     return '$time  0x93帧(${frame.length}B): $hex';
   }
 
+  /// 启动心跳定时器：连接期间每 1 分钟发送一次心跳应答 0x08，
+  /// 保持设备在线（设备超 5 分钟未收到心跳将重启 WiFi）
+  void _startHeartbeat() {
+    _stopHeartbeat();
+    // 连接后立即发送一次，之后固定每 1 分钟一次
+    _sendHeartbeat();
+    _heartbeatTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      _sendHeartbeat();
+    });
+  }
+
+  void _stopHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = null;
+  }
+
+  Future<void> _sendHeartbeat() async {
+    if (state.status != BleDataStatus.streaming) return;
+    try {
+      await _writeWithLog(heartbeatCommand);
+      debugPrint('[数据管理] 心跳(0x08)已发送');
+    } catch (e) {
+      debugPrint('[数据管理] 心跳发送失败: $e');
+    }
+  }
+
   void _stopDataFlow() {
     debugPrint('[数据管理] 停止数据流');
+    _stopHeartbeat();
     _dataSub?.cancel();
     _dataSub = null;
     _batchSleepData?.timeoutTimer?.cancel();
@@ -1671,6 +1724,7 @@ class BleDataCubit extends Cubit<BleDataState> {
 
   @override
   Future<void> close() {
+    _heartbeatTimer?.cancel();
     _connectSub?.cancel();
     _adapterSub?.cancel();
     _dataSub?.cancel();

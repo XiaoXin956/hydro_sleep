@@ -1,50 +1,57 @@
 import 'package:flutter/material.dart';
-import 'package:hydro_sleep/core/theme/app_colors.dart';
-import 'package:hydro_sleep/l10n/app_localizations.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:hydro_sleep/core/bluetooth/ble_connect_cubit.dart';
+import 'package:hydro_sleep/presentation/report/weekly/bloc/weekly_report_cubit.dart';
 import 'package:hydro_sleep/presentation/report/widgets/date_header.dart';
+import 'package:hydro_sleep/presentation/report/widgets/sleep_score_card.dart';
+import 'package:hydro_sleep/presentation/report/widgets/sleep_stages_summary.dart';
 
-/// 周报告内容（占位）
+/// 周报告内容
 class WeeklyReportContent extends StatelessWidget {
   const WeeklyReportContent({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    return CustomScrollView(
-      slivers: [
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) => [
-                const DateHeader(period: DatePeriod.week),
-                const SizedBox(height: 16),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(40),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.bar_chart,
-                              size: 48, color: AppColors.textHint),
-                          const SizedBox(height: 16),
-                          Text(
-                            l10n.reportTitle,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ][index],
-              childCount: 3,
-            ),
+    return BlocProvider(
+      create: (_) => WeeklyReportCubit(
+        connectCubit: context.read<BleConnectCubit>(),
+      )..selectWeek(DateTime.now()),
+      child: const _WeeklyReportBody(),
+    );
+  }
+}
+
+class _WeeklyReportBody extends StatelessWidget {
+  const _WeeklyReportBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(6),
+      physics: const ClampingScrollPhysics(),
+      children: [
+        DateHeader(
+          period: DatePeriod.week,
+          onPeriodChanged: (date) {
+            context.read<WeeklyReportCubit>().selectWeek(date);
+          },
+        ),
+        const SizedBox(height: 4),
+        BlocBuilder<WeeklyReportCubit, WeeklyReportState>(
+          builder: (context, state) => SleepScoreCard(
+            score: state.avgScore,
+            totalMinutes: state.avgTotalMinutes,
+            showBedtime: false,
           ),
         ),
+        const SizedBox(height: 16),
+        BlocBuilder<WeeklyReportCubit, WeeklyReportState>(
+          builder: (context, state) => SleepStagesSummary(
+            stats: state.stageStats,
+            dateKey: state.selectedDate,
+          ),
+        ),
+        const SizedBox(height: 16),
       ],
     );
   }

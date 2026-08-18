@@ -104,35 +104,20 @@ class _DateHeaderState extends State<DateHeader> {
     }
   }
 
-  static const _months = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-  static const _fullMonths = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
+  /// "2026-08-18"
+  String _formatDay(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-  /// "Jun 14, 2026"
-  String _formatDay(DateTime d) => '${_months[d.month - 1]} ${d.day}, ${d.year}';
-
-  /// "Jun 8 – 14, 2026"  (周日 → 周六)
+  /// "2026-08-16 – 2026-08-22" (周日 → 周六)
   String _formatWeek(DateTime d) {
     final start = _weekStart(d);
     final end = _weekEnd(d);
-    if (start.year == end.year) {
-      return '${_months[start.month - 1]} ${start.day}'
-          ' – '
-          '${_months[end.month - 1]} ${end.day}, ${end.year}';
-    }
-    return '${_months[start.month - 1]} ${start.day}, ${start.year}'
-        ' – '
-        '${_months[end.month - 1]} ${end.day}, ${end.year}';
+    return '${_formatDay(start)} – ${_formatDay(end)}';
   }
 
-  /// "June 2026"
+  /// "2026-06"
   String _formatMonth(DateTime d, AppLocalizations _) =>
-      '${_fullMonths[d.month - 1]} ${d.year}';
+      '${d.year}-${d.month.toString().padLeft(2, '0')}';
 
   // ──────────────────── 周计算（周日起） ────────────────────
 

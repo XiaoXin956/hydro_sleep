@@ -89,6 +89,9 @@ class HeartRateChart extends StatelessWidget {
       return '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
     }
 
+    // X 轴固定显示 7 个间隔，根据数据总时长动态计算标签间距
+    final xInterval = (data.length / 7).ceil().clamp(1, data.length);
+
     return LineChartData(
       gridData: FlGridData(
         show: true,
@@ -123,10 +126,10 @@ class HeartRateChart extends StatelessWidget {
           sideTitles: SideTitles(
             showTitles: true,
             reservedSize: 24,
-            interval: 60,
+            interval: xInterval.toDouble(), // 动态间距，共约 7 个标签
             getTitlesWidget: (value, meta) {
               final idx = value.toInt();
-              if (idx >= 0 && idx < data.length && idx % 60 == 0) {
+              if (idx >= 0 && idx < data.length && idx % xInterval == 0) {
                 return Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(xLabel(idx), style: const TextStyle(fontSize: 10)),

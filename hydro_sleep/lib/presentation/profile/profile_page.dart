@@ -8,7 +8,6 @@ import 'package:hydro_sleep/l10n/app_localizations.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/device_list_card.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/language_selector.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/mode_preference_selector.dart';
-import 'package:hydro_sleep/presentation/profile/widgets/profile_card.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/temperature_unit_selector.dart';
 import 'package:hydro_sleep/presentation/profile/widgets/bed_exit_shutdown_selector.dart';
 
@@ -58,11 +57,9 @@ class _ProfilePageState extends State<ProfilePage> {
             delegate: SliverChildBuilderDelegate(
               (context, index) {
                 final items = <Widget>[
-                  const ProfileCard(),
-                  const SizedBox(height: 16),
                   const DeviceListCard(),
                   const SizedBox(height: 16),
-                _buildSettingsWidget(context, theme, l10n),
+                  _buildSettingsWidget(context, theme, l10n),
                   const SizedBox(height: 16),
                   const _FactoryResetRow(),
                   const SizedBox(height: 16),
@@ -78,7 +75,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ];
                 return items[index];
               },
-              childCount: 9,
+              childCount: 7,
             ),
           ),
         ),

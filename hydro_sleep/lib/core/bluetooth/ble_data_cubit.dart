@@ -208,6 +208,9 @@ class BleDataCubit extends Cubit<BleDataState> {
   // 批量拉取状态（0x14 seq 0~47 逐段请求）
   _BatchSleepData? _batchSleepData;
 
+  // 待拉取分钟数据的报表开始时间队列（Unix 秒，0x93 完成后按序排队拉取）
+  final List<int> _pendingSleepDataStartTimes = [];
+
   // 温度存储节流（每 10 秒存一条）
   DateTime _lastTempSaveTime = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -419,6 +422,7 @@ class BleDataCubit extends Cubit<BleDataState> {
       }
       _sleepDataCompleter = null;
       _sleepDataBuffer = [];
+      _pendingSleepDataStartTimes.clear();
       _bleService.clearCharacteristicCache();
       if (state.status != BleDataStatus.idle) {
         debugPrint('[数据管理] 蓝牙已关闭，清理所有数据');
@@ -856,6 +860,22 @@ class BleDataCubit extends Cubit<BleDataState> {
     _sendNextBatchSeq();
   }
 
+  /// 从队列中取出下一个待拉取报表开始时间并启动批量拉取
+  /// 若当前已有批量拉取进行中则跳过（由完成回调触发下一次）
+  void _startNextPendingPull() {
+    if (_batchSleepData != null) {
+      debugPrint('[数据管理] 批量拉取进行中，暂不启动队列中下一个');
+      return;
+    }
+    if (_pendingSleepDataStartTimes.isEmpty) {
+      debugPrint('[数据管理] 待拉取队列为空，分钟数据拉取完成');
+      return;
+    }
+    final startUnix = _pendingSleepDataStartTimes.removeAt(0);
+    debugPrint('[数据管理] 启动队列中报表拉取: startTime=$startUnix, 剩余 ${_pendingSleepDataStartTimes.length} 条');
+    sendFullSleepDataReadCommand(startTime: startUnix);
+  }
+
   /// 发送批量拉取的下一段请求（由 0x94 handler 或初始化时调用）
   Future<void> _sendNextBatchSeq() async {
     final batch = _batchSleepData;
@@ -869,6 +889,8 @@ class BleDataCubit extends Cubit<BleDataState> {
         await SleepDataRepository.markDataLoaded(batch.deviceId, frameStartTime);
       }
       _batchSleepData = null;
+      // 继续拉取队列中下一条待拉取的报表
+      _startNextPendingPull();
       return;
     }
 
@@ -1473,25 +1495,33 @@ class BleDataCubit extends Cubit<BleDataState> {
         if (isLastBatch) {
           debugPrint('[数据管理] 报表查询完成: ${_reportBuffer.length} 条');
           // 收到全部 3 批，自动保存到数据库
+          // 注意：必须同步拷贝快照，sendReportQueryCommand 的 finally 会立即清空 _reportBuffer
           final deviceId = _connectCubit.state.remoteId;
-          if (deviceId != null && _reportBuffer.isNotEmpty) {
+          final reportSnapshot = List<ReportSummary>.unmodifiable(_reportBuffer);
+          if (deviceId != null && reportSnapshot.isNotEmpty) {
             SleepDataRepository.saveReportSummaries(
               deviceId: deviceId,
               asciiId: _lastReportAsciiId,
-              summaries: List.unmodifiable(_reportBuffer),
+              summaries: reportSnapshot,
             ).then((_) async {
-              debugPrint('[数据管理] 报表已自动保存到数据库: ${_reportBuffer.length} 条');
+              debugPrint('[数据管理] 报表已自动保存到数据库: ${reportSnapshot.length} 条');
               // 清理超过 6 个月的过期数据
               unawaited(SleepDataRepository.cleanupOldData());
-              // 自动拉取第一条未读取过的报表的分钟数据
-              final firstUnread = _reportBuffer
-                  .where((s) => s.isValid && !s.dataLoaded)
-                  .firstOrNull;
-              if (firstUnread != null && firstUnread.startTime != null) {
-                final startUnix = firstUnread.startTime!.millisecondsSinceEpoch ~/ 1000;
-                debugPrint('[数据管理] 自动拉取分钟数据: startTime=${firstUnread.startTime}');
-                await sendFullSleepDataReadCommand(startTime: startUnix);
+              // 所有未读取过的报表按开始时间排序后排队，依次自动拉取分钟数据
+              final unread = reportSnapshot
+                  .where((s) => s.isValid && !s.dataLoaded && s.startTime != null)
+                  .toList()
+                ..sort((a, b) => a.startTime!.compareTo(b.startTime!));
+              for (final s in unread) {
+                final startUnix = s.startTime!.millisecondsSinceEpoch ~/ 1000;
+                if (!_pendingSleepDataStartTimes.contains(startUnix) &&
+                    (_batchSleepData == null ||
+                        _batchSleepData!.startTime != startUnix)) {
+                  _pendingSleepDataStartTimes.add(startUnix);
+                }
               }
+              debugPrint('[数据管理] 待拉取分钟数据队列: ${_pendingSleepDataStartTimes.length} 条');
+              _startNextPendingPull();
             }).catchError((e) {
               debugPrint('[数据管理] 报表保存数据库失败: $e');
             });
@@ -1668,6 +1698,7 @@ class BleDataCubit extends Cubit<BleDataState> {
     _dataSub = null;
     _batchSleepData?.timeoutTimer?.cancel();
     _batchSleepData = null;
+    _pendingSleepDataStartTimes.clear();
     if (_responseCompleter != null && !_responseCompleter!.isCompleted) {
       _responseCompleter!.complete(false);
     }

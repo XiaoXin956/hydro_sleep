@@ -54,7 +54,15 @@ dev_dependencies:
     version: *isar_version
   build_runner: any
 
+  # App icons
+  flutter_launcher_icons: ^0.14.3
+
 
 flutter:
   uses-material-design: true
   generate: true
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"

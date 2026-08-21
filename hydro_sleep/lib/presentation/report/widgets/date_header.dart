@@ -5,15 +5,20 @@ import 'package:hydro_sleep/l10n/app_localizations.dart';
 enum DatePeriod { day, week, month, year }
 
 /// 日期切换头，根据 [DatePeriod] 显示不同格式
+///
+/// 受控组件：[selectedDate] 由外部（cubit）提供，
+/// 用户点击箭头后通过 [onPeriodChanged] 通知外部更新日期。
 class DateHeader extends StatefulWidget {
   const DateHeader({
     super.key,
     required this.period,
+    required this.selectedDate,
     this.onPeriodChanged,
     this.onRefresh,
   });
 
   final DatePeriod period;
+  final DateTime selectedDate;
   final ValueChanged<DateTime>? onPeriodChanged;
   final VoidCallback? onRefresh;
 
@@ -22,7 +27,6 @@ class DateHeader extends StatefulWidget {
 }
 
 class _DateHeaderState extends State<DateHeader> {
-  late DateTime _selected;
   late final DateTime _today;
   // 1 = 向左滑出（点右箭头），-1 = 向右滑出（点左箭头）
   int _direction = 1;
@@ -31,46 +35,45 @@ class _DateHeaderState extends State<DateHeader> {
   void initState() {
     super.initState();
     _today = DateTime.now();
-    _selected = _today;
   }
+
+  DateTime get _selected => widget.selectedDate;
 
   // ──────────────────── 左箭头 ────────────────────
 
   void _previous() {
-    setState(() {
-      _direction = -1;
-      switch (widget.period) {
-        case DatePeriod.day:
-          _selected = _selected.subtract(const Duration(days: 1));
-        case DatePeriod.week:
-          _selected = _selected.subtract(const Duration(days: 7));
-        case DatePeriod.month:
-          _selected = DateTime(_selected.year, _selected.month - 1, 1);
-        case DatePeriod.year:
-          _selected = DateTime(_selected.year - 1, 1, 1);
-      }
-    });
-    widget.onPeriodChanged?.call(_selected);
+    DateTime newDate;
+    switch (widget.period) {
+      case DatePeriod.day:
+        newDate = _selected.subtract(const Duration(days: 1));
+      case DatePeriod.week:
+        newDate = _selected.subtract(const Duration(days: 7));
+      case DatePeriod.month:
+        newDate = DateTime(_selected.year, _selected.month - 1, 1);
+      case DatePeriod.year:
+        newDate = DateTime(_selected.year - 1, 1, 1);
+    }
+    setState(() => _direction = -1);
+    widget.onPeriodChanged?.call(newDate);
   }
 
   // ──────────────────── 右箭头（含上限判断） ────────────────────
 
   void _next() {
     if (!_canGoNext) return;
-    setState(() {
-      _direction = 1;
-      switch (widget.period) {
-        case DatePeriod.day:
-          _selected = _selected.add(const Duration(days: 1));
-        case DatePeriod.week:
-          _selected = _selected.add(const Duration(days: 7));
-        case DatePeriod.month:
-          _selected = DateTime(_selected.year, _selected.month + 1, 1);
-        case DatePeriod.year:
-          _selected = DateTime(_selected.year + 1, 1, 1);
-      }
-    });
-    widget.onPeriodChanged?.call(_selected);
+    DateTime newDate;
+    switch (widget.period) {
+      case DatePeriod.day:
+        newDate = _selected.add(const Duration(days: 1));
+      case DatePeriod.week:
+        newDate = _selected.add(const Duration(days: 7));
+      case DatePeriod.month:
+        newDate = DateTime(_selected.year, _selected.month + 1, 1);
+      case DatePeriod.year:
+        newDate = DateTime(_selected.year + 1, 1, 1);
+    }
+    setState(() => _direction = 1);
+    widget.onPeriodChanged?.call(newDate);
   }
 
   bool get _canGoNext {

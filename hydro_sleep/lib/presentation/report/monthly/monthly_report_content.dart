@@ -21,20 +21,34 @@ class MonthlyReportContent extends StatelessWidget {
   }
 }
 
-class _MonthlyReportBody extends StatelessWidget {
+class _MonthlyReportBody extends StatefulWidget {
   const _MonthlyReportBody();
 
   @override
+  State<_MonthlyReportBody> createState() => _MonthlyReportBodyState();
+}
+
+class _MonthlyReportBodyState extends State<_MonthlyReportBody>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return ListView(
       padding: const EdgeInsets.all(6),
       physics: const ClampingScrollPhysics(),
       children: [
-        DateHeader(
-          period: DatePeriod.month,
-          onPeriodChanged: (date) {
-            context.read<MonthlyReportCubit>().selectMonth(date);
-          },
+        BlocBuilder<MonthlyReportCubit, MonthlyReportState>(
+          buildWhen: (prev, curr) => prev.selectedDate != curr.selectedDate,
+          builder: (context, state) => DateHeader(
+            period: DatePeriod.month,
+            selectedDate: state.selectedDate,
+            onPeriodChanged: (date) {
+              context.read<MonthlyReportCubit>().selectMonth(date);
+            },
+          ),
         ),
         const SizedBox(height: 4),
         BlocBuilder<MonthlyReportCubit, MonthlyReportState>(

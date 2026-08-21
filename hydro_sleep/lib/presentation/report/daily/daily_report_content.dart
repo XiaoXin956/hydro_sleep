@@ -39,20 +39,34 @@ class DailyReportContent extends StatelessWidget {
   }
 }
 
-class _DailyReportBody extends StatelessWidget {
+class _DailyReportBody extends StatefulWidget {
   const _DailyReportBody();
 
   @override
+  State<_DailyReportBody> createState() => _DailyReportBodyState();
+}
+
+class _DailyReportBodyState extends State<_DailyReportBody>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return ListView(
       padding: const EdgeInsets.all(6),
       physics: const ClampingScrollPhysics(),
       children: [
-        DateHeader(
-          period: DatePeriod.day,
-          onPeriodChanged: (date) {
-            context.read<DailyReportCubit>().selectDate(date);
-          },
+        BlocBuilder<DailyReportCubit, DailyReportState>(
+          buildWhen: (prev, curr) => prev.selectedDate != curr.selectedDate,
+          builder: (context, state) => DateHeader(
+            period: DatePeriod.day,
+            selectedDate: state.selectedDate,
+            onPeriodChanged: (date) {
+              context.read<DailyReportCubit>().selectDate(date);
+            },
+          ),
         ),
         const SizedBox(height: 4),
         BlocBuilder<DailyReportCubit, DailyReportState>(

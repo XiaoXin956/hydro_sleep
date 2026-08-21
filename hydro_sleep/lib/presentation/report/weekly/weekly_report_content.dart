@@ -21,20 +21,34 @@ class WeeklyReportContent extends StatelessWidget {
   }
 }
 
-class _WeeklyReportBody extends StatelessWidget {
+class _WeeklyReportBody extends StatefulWidget {
   const _WeeklyReportBody();
 
   @override
+  State<_WeeklyReportBody> createState() => _WeeklyReportBodyState();
+}
+
+class _WeeklyReportBodyState extends State<_WeeklyReportBody>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     return ListView(
       padding: const EdgeInsets.all(6),
       physics: const ClampingScrollPhysics(),
       children: [
-        DateHeader(
-          period: DatePeriod.week,
-          onPeriodChanged: (date) {
-            context.read<WeeklyReportCubit>().selectWeek(date);
-          },
+        BlocBuilder<WeeklyReportCubit, WeeklyReportState>(
+          buildWhen: (prev, curr) => prev.selectedDate != curr.selectedDate,
+          builder: (context, state) => DateHeader(
+            period: DatePeriod.week,
+            selectedDate: state.selectedDate,
+            onPeriodChanged: (date) {
+              context.read<WeeklyReportCubit>().selectWeek(date);
+            },
+          ),
         ),
         const SizedBox(height: 4),
         BlocBuilder<WeeklyReportCubit, WeeklyReportState>(
